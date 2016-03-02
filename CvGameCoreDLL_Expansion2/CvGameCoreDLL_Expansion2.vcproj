@@ -510,6 +510,10 @@
 			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}"
 			>
 			<File
+				RelativePath=".\AuI.h"
+				>
+			</File>
+			<File
 				RelativePath=".\banned.h"
 				>
 			</File>
@@ -911,6 +915,14 @@
 			</File>
 			<File
 				RelativePath=".\CvWorldBuilderMapLoader.h"
+				>
+			</File>
+			<File
+				RelativePath=".\RAI.h"
+				>
+			</File>
+			<File
+				RelativePath=".\RBM.h"
 				>
 			</File>
 			<File

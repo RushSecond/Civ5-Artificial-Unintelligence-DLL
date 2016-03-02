@@ -58,6 +58,8 @@
 #include <unordered_set>
 
 #include "AuI.h"
+#include "RBM.h"
+#include "RAI.h"
 
 #define DllExport   __declspec( dllexport )
 
