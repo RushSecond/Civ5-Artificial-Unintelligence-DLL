@@ -856,7 +856,11 @@ void CvUnit::reset(int iID, UnitTypes eUnit, PlayerTypes eOwner, bool bConstruct
 	m_bIgnoreDangerWakeup = false;
 	m_iEmbarkedAllWaterCount = 0;
 	m_iEmbarkExtraVisibility = 0;
+#ifdef RBM_UNIT_EMBARK_PENALTY
+	m_iEmbarkDefensiveModifier = GD_INT_GET(UNIT_EMBARK_PENALTY);
+#else
 	m_iEmbarkDefensiveModifier = 0;
+#endif
 	m_iCapitalDefenseModifier = 0;
 	m_iCapitalDefenseFalloff = 0;
 	m_iCityAttackPlunderModifier = 0;
@@ -10797,7 +10801,7 @@ int CvUnit::GetMaxDefenseStrength(const CvPlot* pInPlot, const CvUnit* pAttacker
 
 	if(m_bEmbarked)
 	{
-		return GetEmbarkedUnitDefense();;
+		return GetEmbarkedUnitDefense();
 	}
 
 	if(GetBaseCombatStrength() == 0)
@@ -10923,17 +10927,30 @@ int CvUnit::GetEmbarkedUnitDefense() const
 {
 	int iRtnValue;
 	int iModifier;
+	
+#ifdef RBM_UNITS_EMBARK_USING_COMBAT_STRENGTH
+	iRtnValue = GetBaseRangedCombatStrength();
+	if (iRtnValue <= 0)
+		iRtnValue = GetBaseCombatStrength(/*ignore embark strength*/true);
+	iRtnValue *= 100;
+#else
 	CvPlayer& kPlayer = GET_PLAYER(m_eOwner);
 	EraTypes eEra = kPlayer.GetCurrentEra();
-
 	iRtnValue = GC.getEraInfo(eEra)->getEmbarkedUnitDefense() * 100;
+#endif
 
 	iModifier = GetEmbarkDefensiveModifier();
+
+#ifdef RBM_UNIT_EMBARK_PENALTY
+	iRtnValue = iRtnValue * (100 + iModifier);
+	iRtnValue /= 100;
+#else
 	if(iModifier > 0)
 	{
 		iRtnValue = iRtnValue * (100 + iModifier);
 		iRtnValue /= 100;
 	}
+#endif
 
 	return iRtnValue;
 }
@@ -18699,6 +18716,12 @@ bool CvUnit::canMoveAndRangedStrike(int iX, int iY)
 	if (canEverRangeStrikeAt(iX, iY))
 	{
 		return true;
+	}
+
+	// If unit is embarked, return false
+	if (isEmbarked())
+	{
+		return false;
 	}
 
 	if (isBarbarian() && plot()->getImprovementType() == GC.getBARBARIAN_CAMP_IMPROVEMENT())

@@ -1620,6 +1620,12 @@ void CvTacticalAI::FindTacticalTargets()
 						newTarget.SetTargetPlayer(pTargetUnit->getOwner());
 						newTarget.SetAuxData((void*)pTargetUnit);
 
+#ifdef RAI_DESTROY_ENEMY_EMBARKED_UNITS
+						if(pTargetUnit->isEmbarked() && !pTargetUnit->IsCombatUnit())
+						{
+							newTarget.SetTargetType(AI_TACTICAL_TARGET_EMBARKED_CIVILIAN);
+						}
+#else
 						if(pTargetUnit->isEmbarked())
 						{
 							if(pTargetUnit->IsCombatUnit())
@@ -1631,6 +1637,7 @@ void CvTacticalAI::FindTacticalTargets()
 								newTarget.SetTargetType(AI_TACTICAL_TARGET_EMBARKED_CIVILIAN);
 							}
 						}
+#endif
 						else
 						{
 							if(IsVeryHighPriorityCivilianTarget(&newTarget))

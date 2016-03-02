@@ -7,6 +7,7 @@
 	------------------------------------------------------------------------------------------------------- */
 
 #include "CvGameCoreDLLPCH.h"
+#include "../CvGameCoreDLLPCH.h"
 #include "CvLuaSupport.h"
 #include "CvLuaArea.h"
 #include "CvLuaCity.h"
@@ -276,6 +277,9 @@ void CvLuaUnit::PushMethods(lua_State* L, int t)
 	Method(DomainModifier);
 	Method(GetStrategicResourceCombatPenalty);
 	Method(GetUnhappinessCombatPenalty);
+#ifdef RBM_UNIT_EMBARK_PENALTY
+	Method(GetEmbarkDefensiveModifier);
+#endif
 	Method(AirSweepCombatMod);
 	Method(CapitalDefenseModifier);
 	Method(CapitalDefenseFalloff);
@@ -1950,8 +1954,11 @@ int CvLuaUnit::lSetBaseCombatStrength(lua_State* L)
 int CvLuaUnit::lGetBaseCombatStrength(lua_State* L)
 {
 	CvUnit* pkUnit = GetInstance(L);
-
+#ifdef RBM_UNITS_EMBARK_USING_COMBAT_STRENGTH
+	const int iResult = pkUnit->GetBaseCombatStrength(true);
+#else
 	const int iResult = pkUnit->GetBaseCombatStrength();
+#endif
 	lua_pushinteger(L, iResult);
 	return 1;
 }
@@ -2832,6 +2839,18 @@ int CvLuaUnit::lGetUnhappinessCombatPenalty(lua_State* L)
 	lua_pushinteger(L, iResult);
 	return 1;
 }
+#if defined RBM_UNIT_EMBARK_PENALTY
+//------------------------------------------------------------------------------
+//int EmbarkDefensiveModifier();
+int CvLuaUnit::lGetEmbarkDefensiveModifier(lua_State* L)
+{
+	CvUnit* pkUnit = GetInstance(L);
+
+	const int iResult = pkUnit->GetEmbarkDefensiveModifier();
+	lua_pushinteger(L, iResult);
+	return 1;
+}
+#endif
 //------------------------------------------------------------------------------
 //int AirSweepCombatMod();
 int CvLuaUnit::lAirSweepCombatMod(lua_State* L)

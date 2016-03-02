@@ -286,6 +286,9 @@ protected:
 	static int lDomainModifier(lua_State* L);
 	static int lGetStrategicResourceCombatPenalty(lua_State* L);
 	static int lGetUnhappinessCombatPenalty(lua_State* L);
+#ifdef RBM_UNIT_EMBARK_PENALTY
+	LUAAPIEXTN(GetEmbarkDefensiveModifier);
+#endif
 	static int lAirSweepCombatMod(lua_State* L);
 	static int lCapitalDefenseModifier(lua_State* L);
 	static int lCapitalDefenseFalloff(lua_State* L);
