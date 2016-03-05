@@ -513,7 +513,7 @@ template<class T> inline T FastMin(const T& _Left, const T& _Right) { return (_D
 #define AUI_PLOT_CALCULATE_NATURE_YIELD_USE_POTENTIAL_CIV_UNIQUE_IMPROVEMENT
 #endif
 /// If a plot is not visible to the attacking player and the unit being considered is not an air unit, disregard the unit
-#define AUI_PLOT_FIX_GET_BEST_DEFENDER_CHECK_PLOT_VISIBILITY
+// #define AUI_PLOT_FIX_GET_BEST_DEFENDER_CHECK_PLOT_VISIBILITY
 
 // Policy Stuff
 /// VITAL FOR MOST FUNCTIONS! Use double instead of int for certain variables (to retain information during division)
@@ -703,7 +703,7 @@ template<class T> inline T FastMin(const T& _Left, const T& _Right) { return (_D
 /// Uses Boldness to determine whether long sieges are worth it instead of a set 8 turns
 #define AUI_TACTICAL_TWEAKED_DAMAGE_CITY_MOVE_USE_BOLDNESS
 /// Sets a different threshold for the amount of damage an enemy unit is required to take before the AI is willing to send its units on suicide attacks
-#define AUI_TACTICAL_TWEAKED_DESTROY_UNIT_MOVE_SUICIDE_THRESHOLD (50)
+#define AUI_TACTICAL_TWEAKED_DESTROY_UNIT_MOVE_SUICIDE_THRESHOLD (100)
 /// Tweaks the algorithm for Plot Heal Moves to keep March promotions in mind and make sure we don't overheal if we're under threat
 #define AUI_TACTICAL_TWEAKED_HEAL_MOVES
 #ifdef AUI_PLOT_COUNT_OCCURANCES_IN_LIST

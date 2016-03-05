@@ -18521,11 +18521,13 @@ bool CvUnit::canEverRangeStrikeAtFromPlot(int iX, int iY, CvPlot* sourcePlot) co
 		return false;
 	}
 
+#ifndef RAI_AI_SEES_ALL_TARGETS
 	// Plot not visible?
 	if (!pTargetPlot->isVisible(getTeam()))
 	{
 		return false;
 	}
+#endif
 
 	// Can only bombard in domain? (used for Subs' torpedo attack)
 	if (getUnitInfo().IsRangeAttackOnlyInDomain())

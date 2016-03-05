@@ -1468,6 +1468,26 @@ void CvTacticalAI::FindTacticalTargets()
 		pLoopPlot = GC.getMap().plotByIndexUnchecked(iI);
 		bValidPlot = false;
 
+#ifdef RAI_AI_SEES_ALL_TARGETS
+		// Make sure I am not a barbarian who can not move into owned territory this early in the game
+		if (m_pPlayer->isBarbarian())
+		{
+			if((pLoopPlot->isVisible(m_pPlayer->getTeam())) && (bBarbsAllowedYet || !pLoopPlot->isOwned()) )
+			{
+				bValidPlot = true;
+			}
+		}
+		else
+			bValidPlot = true;
+
+		if(bValidPlot)
+		{
+			if(PlotAlreadyTargeted(pLoopPlot) != -1)
+			{
+				bValidPlot = false;
+			}
+		}		
+#else
 		if(pLoopPlot->isVisible(m_pPlayer->getTeam()))
 		{
 			// Make sure I am not a barbarian who can not move into owned territory this early in the game
@@ -1490,6 +1510,7 @@ void CvTacticalAI::FindTacticalTargets()
 				}
 			}
 		}
+#endif
 
 		if(bValidPlot)
 		{
@@ -1545,7 +1566,12 @@ void CvTacticalAI::FindTacticalTargets()
 				}
 
 				// ... goody hut?
+#ifdef RAI_AI_SEES_ALL_TARGETS
+				// okay it would be too cheaty for AIs to find ruins automatically
+				else if(!m_pPlayer->isMinorCiv() && pLoopPlot->isGoody() && pLoopPlot->isVisible(m_pPlayer->getTeam()))
+#else
 				else if(!m_pPlayer->isMinorCiv() && pLoopPlot->isGoody())
+#endif
 				{
 					newTarget.SetTargetType(AI_TACTICAL_TARGET_ANCIENT_RUINS);
 					newTarget.SetAuxData((void*)pLoopPlot);
@@ -1766,6 +1792,19 @@ void CvTacticalAI::ProcessDominanceZones()
 			if(move.m_iPriority >= 0)
 			{
 				CvTacticalMoveXMLEntry* pkTacticalMoveInfo = GC.getTacticalMoveInfo(move.m_eMoveType);
+#ifdef RAI_LOGGING_FIXES
+				CvString strMoveName;
+				if(pkTacticalMoveInfo)
+				{
+					strMoveName = (CvString)pkTacticalMoveInfo->GetType();
+					if (GC.getLogging() && GC.getAILogging())
+					{
+						CvString strLogString;
+						strLogString.Format("Processing Tactical Move: %s", strMoveName.GetCString());
+						LogTacticalMessage(strLogString);
+					}
+				}
+#endif
 				if(pkTacticalMoveInfo && pkTacticalMoveInfo->IsDominanceZoneMove())
 				{
 					for(int iI = 0; iI < m_pMap->GetNumZones(); iI++)
@@ -2319,7 +2358,11 @@ bool CvTacticalAI::PlotDamageCityMoves()
 				// AMS: If we have the city already down to minimum, don't use ranged... Only try to capture.
 				bool bSelectNoRanged = (iRequiredDamage <= 1);
 
+#ifdef RAI_LOGGING_FIXES
+				if (bLog && bSelectNoRanged)
+#else
 				if (bLog)
+#endif			
 				{
 					CvString strLogString;
 					strLogString.Format("City is at 1HP at X: %d, Y: %d", pPlot->getX(), pPlot->getY());
@@ -2415,6 +2458,15 @@ void CvTacticalAI::PlotDestroyUnitMoves(AITacticalTargetType targetType, bool bM
 		UnitHandle pDefender = pPlot->getVisibleEnemyDefender(m_pPlayer->GetID());
 		if(pDefender)
 		{
+#ifdef RAI_LOGGING_FIXES
+			if (GC.getLogging() && GC.getAILogging())
+			{
+				CvString strLogString;
+				strLogString.Format("Got pDefender: %s At X: %d, At Y: %d",
+					GC.getUnitInfo(pDefender->getUnitType())->GetDescription(), pDefender->getX(), pDefender->getY());
+				LogTacticalMessage(strLogString);
+			}
+#endif
 #ifdef AUI_TACTICAL_PARATROOPERS_PARADROP
 			bUnitCanAttack = FindUnitsWithinStrikingDistance(pPlot, 1, 0, false /* bNoRangedUnits */, false, false, false, false, false, true /* bIgnoreParadrop */);
 #else
@@ -2560,11 +2612,15 @@ void CvTacticalAI::PlotMovesToSafety(bool bCombatUnits)
 							}
 						}
 
+#ifdef RAI_IMPROVED_FLEE_LOGIC
+						// Everyone else aint no wuss from just a lil damage
+#else
 						// Everyone else flees if under enemy fire or if at less than or equal to 50% combat strength
 						else if (pUnit->IsUnderEnemyRangedAttack() || pUnit->GetBaseCombatStrengthConsideringDamage() * 2 <= pUnit->GetBaseCombatStrength())
 						{
 							bAddUnit = true;
 						}
+#endif
 					}
 
 					// Also flee if danger is really high in current plot (but not if we're barbarian)
@@ -6669,7 +6725,7 @@ void CvTacticalAI::ExecuteAttack(CvTacticalTarget* pTarget, CvPlot* pTargetPlot,
 	bool bFirstAttackRanged = false;
 	bool bFirstAttackCity = false;
 #ifdef AUI_TACTICAL_TWEAKED_EXECUTE_ATTACK
-	const double dSelfDamageRecklessness = (100.0 - m_pPlayer->GetDiplomacyAI()->GetBoldness()) / 100.0;
+	const double dSelfDamageRecklessness = (double)(GC.getBASE_MELEE_DAMAGE_RECKLESSNESS() - m_pPlayer->GetDiplomacyAI()->GetBoldness()) / 100.0;
 #endif // AUI_TACTICAL_TWEAKED_EXECUTE_ATTACK
 
 	if(PlotAlreadyTargeted(pTargetPlot) != -1)
@@ -6679,6 +6735,15 @@ void CvTacticalAI::ExecuteAttack(CvTacticalTarget* pTarget, CvPlot* pTargetPlot,
 
 	// How much damage do we still need to inflict?
 	int iDamageRemaining = (pTarget->GetAuxIntData() * (100 + GC.getAI_TACTICAL_OVERKILL_PERCENT())) / 100;
+
+// This actually should be unnessary, since if I did everything else right,
+// ExecuteAttack would only be called if the plot is visible at SOME POINT this turn
+/**#ifdef RAI_AI_SEES_ALL_TARGETS
+	if (!pTargetPlot->isVisible(m_pPlayer->getTeam())
+	{
+		// Start by getting vision on the target
+	}
+#endif**/
 
 #ifdef AUI_TACTICAL_TWEAKED_EXECUTE_ATTACK
 	// Start by sending possible air sweeps
@@ -7037,6 +7102,7 @@ void CvTacticalAI::ExecuteAttack(CvTacticalTarget* pTarget, CvPlot* pTargetPlot,
 							}
 						}
 					}
+#ifndef RAI_LOGGING_FIXES
 					else
 					{
 						if (GC.getLogging() && GC.getAILogging())
@@ -7046,6 +7112,7 @@ void CvTacticalAI::ExecuteAttack(CvTacticalTarget* pTarget, CvPlot* pTargetPlot,
 							LogTacticalMessage(strMsg);
 						}
 					}
+#endif
 				}
 			}
 		}
@@ -7167,7 +7234,7 @@ void CvTacticalAI::ExecuteAttack(CvTacticalTarget* pTarget, CvPlot* pTargetPlot,
 	}
 
 	// Fourth loop for melee units that were previously blocked
-	for (unsigned int iI = 0; iI < apMeleeUnitsBlocked.size(); iI++)
+	for (unsigned int iI = 0; iI < apMeleeUnitsBlocked.size() && iDamageRemaining > 0; iI++)
 	{
 		UnitHandle pUnit = m_pPlayer->getUnit(apMeleeUnitsBlocked[iI].GetID());
 		if (pUnit)
@@ -7350,6 +7417,8 @@ void CvTacticalAI::ExecuteAttack(CvTacticalTarget* pTarget, CvPlot* pTargetPlot,
 
 #ifdef AUI_TACTICAL_TWEAKED_EXECUTE_ATTACK_POSTPONE_MELEE_MOVE
 	// Now we execute the postponed move command for melee units
+#ifndef RAI_DONT_WASTE_COMBAT_ACTIONS
+	// nooooo they could do something else useful with their lives
 	if (apMeleeUnitsToMoveUp.size() > 0)
 	{
 		for (std::vector<UnitHandle>::iterator it = apMeleeUnitsToMoveUp.begin(); it != apMeleeUnitsToMoveUp.end(); ++it)
@@ -7366,6 +7435,7 @@ void CvTacticalAI::ExecuteAttack(CvTacticalTarget* pTarget, CvPlot* pTargetPlot,
 			}
 		}
 	}
+#endif // RAI_DONT_WASTE_COMBAT_ACTIONS
 #endif // AUI_TACTICAL_TWEAKED_EXECUTE_ATTACK_POSTPONE_MELEE_MOVE
 #else
 	// Start by applying damage from city bombards
@@ -9206,8 +9276,15 @@ bool CvTacticalAI::ExecuteSafeBombards(CvTacticalTarget& kTarget)
 	{
 		UnitHandle pUnit = m_pPlayer->getUnit(*it);
 #ifdef AUI_TACTICAL_FIX_EXECUTE_SAFE_BOMBARDS_CHECK_RANGE
+#ifdef RAI_AI_SEES_ALL_TARGETS
+		if(pUnit && pUnit->IsCanAttackRanged() && !pUnit->isOutOfAttacks() && 
+			pUnit->canEverRangeStrikeAt(pTargetPlot->getX(), pTargetPlot->getY()) && IsExpectedToDamageWithRangedAttack(pUnit, pTargetPlot)
+			&& pTargetPlot->isVisible(m_pPlayer->getTeam()))
+#else
 		if(pUnit && pUnit->IsCanAttackRanged() && !pUnit->isOutOfAttacks() && 
 			pUnit->canEverRangeStrikeAt(pTargetPlot->getX(), pTargetPlot->getY()) && IsExpectedToDamageWithRangedAttack(pUnit, pTargetPlot))
+#endif // RAI_AI_SEES_ALL_TARGETS
+		
 #else
 		if(pUnit && pUnit->IsCanAttackRanged() && !pUnit->isOutOfAttacks())
 #endif // AUI_TACTICAL_FIX_EXECUTE_SAFE_BOMBARDS_CHECK_RANGE
@@ -9901,8 +9978,16 @@ bool CvTacticalAI::ExecuteFlankAttack(CvTacticalTarget& kTarget)
 					if(FindUnitsWithinStrikingDistance(pTargetPlot, 1, 0, false /* bNoRangedUnits */))
 #endif // AUI_TACTICAL_PARATROOPERS_PARADROP
 					{
+						
+#ifdef RAI_NO_MELEE_SUICIDE
+						if (ComputeTotalExpectedDamage(&kTarget, pTargetPlot) >= pDefender->GetCurrHitPoints())
+							ExecuteAttack(&kTarget, pTargetPlot, false/*bInflictWhatWeTake*/, true/*bMustSurviveAttack*/);
+						else
+							ExecuteAttack(&kTarget, pTargetPlot, true/*bInflictWhatWeTake*/, true/*bMustSurviveAttack*/);
+#else
 						ComputeTotalExpectedDamage(&kTarget, pTargetPlot);
 						ExecuteAttack(&kTarget, pTargetPlot, false/*bInflictWhatWeTake*/, true/*bMustSurviveAttack*/);
+#endif
 					}
 				}
 			}
@@ -10613,6 +10698,9 @@ bool CvTacticalAI::FindUnitsWithinStrikingDistance(CvPlot* pTarget, int iNumTurn
 bool CvTacticalAI::FindUnitsWithinStrikingDistance(CvPlot* pTarget, int iNumTurnsAway, int iPreferredDamageLevel, bool bNoRangedUnits, bool bNavalOnly, bool bMustMoveThrough, bool bIncludeBlockedUnits, bool bWillPillage, bool bTargetUndefended)
 #endif // AUI_ASTAR_PARADROP
 {
+#ifdef RAI_AI_SEES_ALL_TARGETS
+	bool canSeeTarget = pTarget->isVisible(m_pPlayer->getTeam());
+#endif
 	list<int>::iterator it;
 	UnitHandle pLoopUnit;
 
@@ -10633,6 +10721,15 @@ bool CvTacticalAI::FindUnitsWithinStrikingDistance(CvPlot* pTarget, int iNumTurn
 		pLoopUnit = m_pPlayer->getUnit(*it);
 		if(pLoopUnit)
 		{
+#ifdef RAI_LOGGING_FIXES
+			if (GC.getLogging() && GC.getAILogging())
+			{
+				CvString strLogString;
+				strLogString.Format("Possible Attacker: %s At X: %d, At Y: %d",
+					GC.getUnitInfo(pLoopUnit->getUnitType())->GetDescription(), pLoopUnit->getX(), pLoopUnit->getY());
+				LogTacticalMessage(strLogString);
+			}
+#endif
 			if(!bNavalOnly || pLoopUnit->getDomainType() == DOMAIN_SEA)
 			{
 				// don't use non-combat units
@@ -10707,6 +10804,17 @@ bool CvTacticalAI::FindUnitsWithinStrikingDistance(CvPlot* pTarget, int iNumTurn
 					unit.SetHealthPercent(pLoopUnit->GetCurrHitPoints(), pLoopUnit->GetMaxHitPoints());
 					m_CurrentMoveUnits.push_back(unit);
 					rtnValue = true;
+#ifdef RAI_LOGGING_FIXES
+					if (GC.getLogging() && GC.getAILogging())
+					{
+						CvString strLogString;
+						strLogString.Format("Into CurrentMoveUnits: %s", GC.getUnitInfo(pLoopUnit->getUnitType())->GetDescription());
+						LogTacticalMessage(strLogString);
+					}
+#endif
+#ifdef RAI_AI_SEES_ALL_TARGETS
+					canSeeTarget = true;
+#endif
 				}
 
 #ifdef AUI_TACTICAL_FIND_UNITS_WITHIN_STRIKING_DISTANCE_NO_RANGED_SHORTCUT
@@ -10715,6 +10823,14 @@ bool CvTacticalAI::FindUnitsWithinStrikingDistance(CvPlot* pTarget, int iNumTurn
 				else if(!bNoRangedUnits && !bWillPillage && pLoopUnit->IsCanAttackRanged())
 #endif // AUI_TACTICAL_FIND_UNITS_WITHIN_STRIKING_DISTANCE_NO_RANGED_SHORTCUT
 				{
+#ifdef RAI_LOGGING_FIXES
+					if (GC.getLogging() && GC.getAILogging())
+					{
+						CvString strLogString;
+						strLogString.Format("I'm ranged: %s", GC.getUnitInfo(pLoopUnit->getUnitType())->GetDescription());
+						LogTacticalMessage(strLogString);
+					}
+#endif
 					// Don't use air units for air strikes if at or below half health
 					if (pLoopUnit->getDomainType() != DOMAIN_AIR || (pLoopUnit->getDamage() * 2) < GC.getMAX_HIT_POINTS())
 					{
@@ -10740,10 +10856,26 @@ bool CvTacticalAI::FindUnitsWithinStrikingDistance(CvPlot* pTarget, int iNumTurn
 						if(plotDistance(pLoopUnit->getX(), pLoopUnit->getY(), pTarget->getX(), pTarget->getY()) <= pLoopUnit->GetRange())
 						{
 #endif // AUI_UNIT_RANGE_PLUS_MOVE
+#ifdef RAI_LOGGING_FIXES
+							if (GC.getLogging() && GC.getAILogging())
+							{
+								CvString strLogString;
+								strLogString.Format("In range: %s", GC.getUnitInfo(pLoopUnit->getUnitType())->GetDescription());
+								LogTacticalMessage(strLogString);
+							}
+#endif
 #ifdef AUI_UNIT_CAN_MOVE_AND_RANGED_STRIKE
 							// Will we do any damage
 							if (IsExpectedToDamageWithRangedAttack(pLoopUnit, pTarget))
 							{
+#ifdef RAI_LOGGING_FIXES
+								if (GC.getLogging() && GC.getAILogging())
+								{
+									CvString strLogString;
+									strLogString.Format("I'll damage: %s", GC.getUnitInfo(pLoopUnit->getUnitType())->GetDescription());
+									LogTacticalMessage(strLogString);
+								}
+#endif // logging fixes
 								// Can we actually attack the target? (called afterwards to minimize pathfinder calls)
 								if (pLoopUnit->canMoveAndRangedStrike(pTarget->getX(), pTarget->getY()))
 #else
@@ -10776,7 +10908,20 @@ bool CvTacticalAI::FindUnitsWithinStrikingDistance(CvPlot* pTarget, int iNumTurn
 									unit.SetHealthPercent(100, 100);  // Don't take damage from bombarding, so show as fully healthy
 #endif // AUI_TACTICAL_FIX_FIND_UNITS_WITHIN_STRIKING_DISTANCE_RANGED_STRENGTH
 									m_CurrentMoveUnits.push_back(unit);
+#ifdef RAI_LOGGING_FIXES
+									if (GC.getLogging() && GC.getAILogging())
+									{
+										CvString strLogString;
+										strLogString.Format("Into CurrentMoveUnits: %s", GC.getUnitInfo(pLoopUnit->getUnitType())->GetDescription());
+										LogTacticalMessage(strLogString);
+									}
+#endif
 									rtnValue = true;
+#ifdef RAI_AI_SEES_ALL_TARGETS
+									// This ranged unit will be able to see the target if LOS is greater than or equal to range
+									if (pLoopUnit->getExtraVisibilityRange() + GC.getUNIT_VISIBILITY_RANGE() >= pLoopUnit->GetRange())
+										canSeeTarget = true;
+#endif
 #ifdef AUI_TACTICAL_FIX_FIND_UNITS_WITHIN_STRIKING_DISTANCE_RANGED_LONG_DISTANCE
 									bIsRangedDamage = true;
 #endif // AUI_TACTICAL_FIX_FIND_UNITS_WITHIN_STRIKING_DISTANCE_RANGED_LONG_DISTANCE
@@ -10813,6 +10958,17 @@ bool CvTacticalAI::FindUnitsWithinStrikingDistance(CvPlot* pTarget, int iNumTurn
 						unit.SetHealthPercent(pLoopUnit->GetCurrHitPoints(), pLoopUnit->GetMaxHitPoints());
 						m_CurrentMoveUnits.push_back(unit);
 						rtnValue = true;
+#ifdef RAI_LOGGING_FIXES
+						if (GC.getLogging() && GC.getAILogging())
+						{
+							CvString strLogString;
+							strLogString.Format("Into CurrentMoveUnits: %s", GC.getUnitInfo(pLoopUnit->getUnitType())->GetDescription());
+							LogTacticalMessage(strLogString);
+						}
+#endif
+#ifdef RAI_AI_SEES_ALL_TARGETS
+						canSeeTarget = true;
+#endif
 					}
 
 #ifdef AUI_ASTAR_PARADROP
@@ -10830,6 +10986,17 @@ bool CvTacticalAI::FindUnitsWithinStrikingDistance(CvPlot* pTarget, int iNumTurn
 						unit.SetHealthPercent(pLoopUnit->GetCurrHitPoints(), pLoopUnit->GetMaxHitPoints());
 						m_CurrentMoveUnits.push_back(unit);
 						rtnValue = true;
+#ifdef RAI_LOGGING_FIXES
+						if (GC.getLogging() && GC.getAILogging())
+						{
+							CvString strLogString;
+							strLogString.Format("Into CurrentMoveUnits: %s", GC.getUnitInfo(pLoopUnit->getUnitType())->GetDescription());
+							LogTacticalMessage(strLogString);
+						}
+#endif
+#ifdef RAI_AI_SEES_ALL_TARGETS
+						canSeeTarget = true;
+#endif
 					}
 
 					// Units that can make it when others get out of the way are also potentially useful, but give them half priority so they bring up the rear
@@ -10848,11 +11015,35 @@ bool CvTacticalAI::FindUnitsWithinStrikingDistance(CvPlot* pTarget, int iNumTurn
 						unit.SetHealthPercent(pLoopUnit->GetCurrHitPoints(), pLoopUnit->GetMaxHitPoints());
 						m_CurrentMoveUnits.push_back(unit);
 						rtnValue = true;
+#ifdef RAI_LOGGING_FIXES
+						if (GC.getLogging() && GC.getAILogging())
+						{
+							CvString strLogString;
+							strLogString.Format("Into CurrentMoveUnits: %s", GC.getUnitInfo(pLoopUnit->getUnitType())->GetDescription());
+							LogTacticalMessage(strLogString);
+						}
+#endif
+#ifdef RAI_AI_SEES_ALL_TARGETS
+						canSeeTarget = true;
+#endif
 					}
 				}
 			}
+		} // end unit loop
+
+#ifdef RAI_AI_SEES_ALL_TARGETS
+	if (!canSeeTarget)
+	{
+		if (GC.getLogging() && GC.getAILogging())
+		{
+			CvString strLogString;
+			strLogString.Format("Nothing sees Target At X: %d, At Y: %d", pTarget->getX(), pTarget->getY());
+			LogTacticalMessage(strLogString);
 		}
+		return false;		
 	}
+#endif
+}
 
 #ifdef AUI_TACTICAL_FIND_UNITS_WITHIN_STRIKING_DISTANCE_AIR_SWEEPS
 	//AMS: As we have air units on the attack targets we should also check possible air sweeps
@@ -12703,6 +12894,13 @@ bool CvTacticalAI::NearVisibleEnemy(UnitHandle pUnit, int iRange)
 			for(pLoopUnit = kPlayer.firstUnit(&iLoop); pLoopUnit; pLoopUnit = kPlayer.nextUnit(&iLoop))
 			{
 				// Make sure this tile is visible to us
+#ifdef RAI_AI_SEES_ALL_TARGETS
+				// Check distance, not visibility
+				if(plotDistance(pLoopUnit->getX(), pLoopUnit->getY(), pUnit->getX(), pUnit->getY()) <= iRange)
+				{
+					return true;
+				}
+#else
 				if(pLoopUnit->plot()->isVisible(m_pPlayer->getTeam()))
 				{
 					// Check distance
@@ -12711,6 +12909,7 @@ bool CvTacticalAI::NearVisibleEnemy(UnitHandle pUnit, int iRange)
 						return true;
 					}
 				}
+#endif			
 			}
 
 			// Loop through their cities
