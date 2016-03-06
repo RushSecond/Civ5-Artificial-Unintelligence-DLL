@@ -531,7 +531,7 @@ template<class T> inline T FastMin(const T& _Left, const T& _Right) { return (_D
 /// Divides the weight of religion flavor by this number if we have not founded a pantheon or if we've founded a pantheon but there are no more religions to found
 #define AUI_POLICY_DIVIDE_RELIGION_WEIGHT_WHEN_NO_RELIGION (2)
 /// Divides the weight of military flavors (offense, defense, military training) by this number if we do not have any policies
-#define AUI_POLICY_DIVIDE_MILITARY_WEIGHT_FOR_OPENER (4)
+// #define AUI_POLICY_DIVIDE_MILITARY_WEIGHT_FOR_OPENER (4)
 /// When playing a One City Challenge game, expansion flavor for policies is nullified
 #define AUI_POLICY_NULLIFY_EXPANSION_WEIGHT_FOR_OCC
 /// Replaces the divider for opening new branches with a "determination" divider based on the geometric mean of grand strategy ratios (old one was a holdover from pre-BNW)
