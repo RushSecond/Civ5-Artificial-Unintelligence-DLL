@@ -3046,7 +3046,11 @@ void CvTacticalAI::PlotPlunderTradePlotMoves (DomainTypes eDomain)
 			if (!CheckAndExecuteParadrop(pUnit, pClosestPlot))
 #endif // AUI_TACTICAL_PLOT_PLUNDER_MOVES_USES_PATHFINDER
 			{
+#ifdef RAI_FORTIFY_IF_NO_MOVE
+				ExecuteMoveToPlot(pUnit, pClosestPlot, false, MAX_INT);
+#else
 				pUnit->PushMission(CvTypes::getMISSION_MOVE_TO(), pClosestPlot->getX(), pClosestPlot->getY());
+#endif
 			}
 #else
 			pUnit->PushMission(CvTypes::getMISSION_MOVE_TO(), pClosestPlot->getX(), pClosestPlot->getY());
@@ -6847,10 +6851,13 @@ void CvTacticalAI::ExecuteAttack(CvTacticalTarget* pTarget, CvPlot* pTargetPlot,
 	// First loop for melee units just to reposition.
 	for (unsigned int iI = 0; iI < m_CurrentMoveUnits.size(); iI++)
 	{
-		if ((!bInflictWhatWeTake) || m_CurrentMoveUnits[iI].GetExpectedTargetDamage() >= m_CurrentMoveUnits[iI].GetExpectedSelfDamage() * dSelfDamageRecklessness)
+#ifdef RAI_NO_MELEE_SUICIDE
+		if (IsMeleeAttackCorrect(&(m_CurrentMoveUnits[iI]), pTargetPlot, bInflictWhatWeTake, dSelfDamageRecklessness))			
+#else
+		if ((!bInflictWhatWeTake) || m_CurrentMoveUnits[iI].GetExpectedTargetDamage() >= m_CurrentMoveUnits[iI].GetExpectedSelfDamage() * dSelfDamageRecklessness)		
+#endif
 		{
 			UnitHandle pUnit = m_pPlayer->getUnit(m_CurrentMoveUnits[iI].GetID());
-
 			if (pUnit)
 			{
 #ifdef AUI_TACTICAL_TWEAKED_EXECUTE_ATTACK_NO_MELEE_SUICIDE_AGAINST_CITY
@@ -6981,7 +6988,11 @@ void CvTacticalAI::ExecuteAttack(CvTacticalTarget* pTarget, CvPlot* pTargetPlot,
 	// Second loop is ranged units only
 	for (unsigned int iI = 0; iI < m_CurrentMoveUnits.size() && iDamageRemaining > 0; iI++)
 	{
+#ifdef RAI_NO_MELEE_SUICIDE
+		if (IsMeleeAttackCorrect(&(m_CurrentMoveUnits[iI]), pTargetPlot, bInflictWhatWeTake, dSelfDamageRecklessness))
+#else
 		if (!bInflictWhatWeTake || m_CurrentMoveUnits[iI].GetExpectedTargetDamage() >= m_CurrentMoveUnits[iI].GetExpectedSelfDamage() * dSelfDamageRecklessness)
+#endif	
 		{
 			UnitHandle pUnit = m_pPlayer->getUnit(m_CurrentMoveUnits[iI].GetID());
 
@@ -7136,7 +7147,11 @@ void CvTacticalAI::ExecuteAttack(CvTacticalTarget* pTarget, CvPlot* pTargetPlot,
 	// Third loop is only for melee units that may attack
 	for (unsigned int iI = 0; iI < m_CurrentMoveUnits.size() && iDamageRemaining > 0; iI++)
 	{
+#ifdef RAI_NO_MELEE_SUICIDE
+		if (IsMeleeAttackCorrect(&(m_CurrentMoveUnits[iI]), pTargetPlot, bInflictWhatWeTake, dSelfDamageRecklessness))
+#else
 		if (!bInflictWhatWeTake || m_CurrentMoveUnits[iI].GetExpectedTargetDamage() >= m_CurrentMoveUnits[iI].GetExpectedSelfDamage() * dSelfDamageRecklessness)
+#endif	
 		{
 			UnitHandle pUnit = m_pPlayer->getUnit(m_CurrentMoveUnits[iI].GetID());
 
@@ -7329,11 +7344,15 @@ void CvTacticalAI::ExecuteAttack(CvTacticalTarget* pTarget, CvPlot* pTargetPlot,
 	}
 
 	// Fifth loop to account for newly moved melee units
-	for (unsigned int iI = 0; iI < m_CurrentMoveUnits.size() && iDamageRemaining > 0; iI++)
+	for (unsigned int iI = 0; iI < apMeleeUnitsBlocked.size() && iDamageRemaining > 0; iI++)
 	{
-		if (!bInflictWhatWeTake || m_CurrentMoveUnits[iI].GetExpectedTargetDamage() >= m_CurrentMoveUnits[iI].GetExpectedSelfDamage() * dSelfDamageRecklessness)
+#ifdef RAI_NO_MELEE_SUICIDE
+		if (IsMeleeAttackCorrect(&(apMeleeUnitsBlocked[iI]), pTargetPlot, bInflictWhatWeTake, dSelfDamageRecklessness))
+#else
+		if (!bInflictWhatWeTake || apMeleeUnitsBlocked[iI].GetExpectedTargetDamage() >= apMeleeUnitsBlocked[iI].GetExpectedSelfDamage() * dSelfDamageRecklessness)
+#endif	
 		{
-			UnitHandle pUnit = m_pPlayer->getUnit(m_CurrentMoveUnits[iI].GetID());
+			UnitHandle pUnit = m_pPlayer->getUnit(apMeleeUnitsBlocked[iI].GetID());
 
 			if (pUnit)
 			{
@@ -7781,8 +7800,16 @@ void CvTacticalAI::ExecuteRepositionMoves()
 
 				if(pBestPlot)
 				{
+#ifdef RAI_LOGGING_FIXES
+					CvString strLogString;
+					strLogString.Format("%s going to move to space, X: %d, Y: %d, Current X: %d, Current Y: %d", strTemp.GetCString(),
+										pBestPlot->getX(), pBestPlot->getY(), pUnit->getX(), pUnit->getY());
+					LogTacticalMessage(strLogString);
+#endif
+
 					if(MoveToEmptySpaceNearTarget(pUnit, pBestPlot, (pUnit->getDomainType()==DOMAIN_LAND)))
 					{
+
 #ifdef AUI_TACTICAL_FREE_PILLAGE
 						CheckAndExecuteFreePillageMoves(pUnit);
 #endif // AUI_TACTICAL_FREE_PILLAGE
@@ -7792,12 +7819,27 @@ void CvTacticalAI::ExecuteRepositionMoves()
 							pRepositionPlot = GetBestRepositionPlot(pUnit, pBestPlot, 1);
 							if (pRepositionPlot)
 							{
+#ifdef RAI_LOGGING_FIXES
+								CvString strLogString;
+								strLogString.Format("%s reposition a little, X: %d, Y: %d, Current X: %d, Current Y: %d", strTemp.GetCString(),
+													pRepositionPlot->getX(), pRepositionPlot->getY(), pUnit->getX(), pUnit->getY());
+								LogTacticalMessage(strLogString);
+#endif
+#ifdef RAI_FORTIFY_IF_NO_MOVE
+								ExecuteMoveToPlot(pUnit, pRepositionPlot, false, MAX_INT);
+#else
 								pUnit->PushMission(CvTypes::getMISSION_MOVE_TO(), pRepositionPlot->getX(), pRepositionPlot->getY());
+#endif
 							}
 						}
 #endif // AUI_TACTICAL_EXECUTE_REPOSITION_MOVES_PATROL_IF_MOVES_REMAIN
+#ifdef RAI_FORTIFY_IF_NO_MOVE
+						else
+							ExecuteMoveToPlot(pUnit, GC.getMap().plot(pUnit->getX(), pUnit->getY()), false, MAX_INT);
+#else
 						pUnit->finishMoves();
 						UnitProcessed(m_CurrentMoveUnits[iI].GetID(), pUnit->IsCombatUnit());
+#endif
 						if(GC.getLogging() && GC.getAILogging())
 						{
 							CvString strLogString;
@@ -8081,7 +8123,11 @@ void CvTacticalAI::ExecuteMovesToSafestPlot()
 				if (!CheckAndExecuteParadrop(pUnit, pBestPlot))
 				{
 					// Move to the lowest danger value found
+#ifdef RAI_FORTIFY_IF_NO_MOVE
+					ExecuteMoveToPlot(pUnit, pBestPlot, false, MAX_INT);
+#else
 					pUnit->PushMission(CvTypes::getMISSION_MOVE_TO(), pBestPlot->getX(), pBestPlot->getY(), MOVE_UNITS_IGNORE_DANGER);
+#endif
 				}
 #else
 				// Move to the lowest danger value found
@@ -11902,6 +11948,19 @@ bool CvTacticalAI::IsExpectedToDamageWithRangedAttack(UnitHandle pAttacker, CvPl
 	return iExpectedDamage > 0;
 }
 
+#ifdef RAI_NO_MELEE_SUICIDE
+bool CvTacticalAI::IsMeleeAttackCorrect(CvTacticalUnit* pUnit, CvPlot* pTargetPlot,
+										bool bInflictWhatWeTake, double dSelfDamageRecklessness)
+{
+	int myDamage = m_pPlayer->getUnit(pUnit->GetID())->GetPower() * pUnit->GetExpectedSelfDamage();
+	CvUnit* enemyUnit = pTargetPlot->getVisibleEnemyDefender(m_pPlayer->GetID());
+
+	int theirDamage = enemyUnit->GetPower() * pUnit->GetExpectedTargetDamage();
+	double recklessnessMod = bInflictWhatWeTake ? dSelfDamageRecklessness : dSelfDamageRecklessness / 2.0;
+	 
+	return (double)theirDamage >= (double)myDamage * recklessnessMod;
+}
+#endif
 
 /// Move up to our target avoiding our own units if possible
 bool CvTacticalAI::MoveToEmptySpaceNearTarget(UnitHandle pUnit, CvPlot* pTarget, bool bLand)
@@ -11987,6 +12046,11 @@ bool CvTacticalAI::MoveToEmptySpaceNearTarget(UnitHandle pUnit, CvPlot* pTarget,
 
 		// Go ahead with mission
 		bool bMoveWasSafe;
+#ifdef RAI_LOGGING_FIXES
+		CvString strLogString;
+		strLogString.Format("Calling MoveToUsingSafeEmbark");
+		LogTacticalMessage(strLogString);
+#endif
 #ifdef AUI_TACTICAL_FIX_MOVE_TO_USING_SAFE_EMBARK_SINGLE_PATHFINDER_CALL
 		MoveToUsingSafeEmbark(pUnit, pLoopPlot, bMoveWasSafe, iTurnsNeeded, true);
 #else
@@ -12160,7 +12224,11 @@ bool CvTacticalAI::MoveToUsingSafeEmbark(UnitHandle pUnit, CvPlot* pTargetPlot, 
 #ifdef AUI_TACTICAL_PARATROOPERS_PARADROP
 			if (!CheckAndExecuteParadrop(pUnit, pTargetPlot, iTurnsToTarget))
 			{
+#ifdef RAI_FORTIFY_IF_NO_MOVE
+				ExecuteMoveToPlot(pUnit, pTargetPlot, false, MAX_INT);
+#else
 				pUnit->PushMission(CvTypes::getMISSION_MOVE_TO(), pTargetPlot->getX(), pTargetPlot->getY());
+#endif // RAI_FORTIFY_IF_NO_MOVE
 			}
 #else
 			pUnit->PushMission(CvTypes::getMISSION_MOVE_TO(), pTargetPlot->getX(), pTargetPlot->getY());
@@ -12210,7 +12278,11 @@ bool CvTacticalAI::MoveToUsingSafeEmbark(UnitHandle pUnit, CvPlot* pTargetPlot, 
 #ifdef AUI_TACTICAL_PARATROOPERS_PARADROP
 				if (!CheckAndExecuteParadrop(pUnit, pTargetPlot, iTurnsToTarget))
 				{
+#ifdef RAI_FORTIFY_IF_NO_MOVE
+					ExecuteMoveToPlot(pUnit, pTargetPlot, false, MAX_INT);
+#else
 					pUnit->PushMission(CvTypes::getMISSION_MOVE_TO(), pTargetPlot->getX(), pTargetPlot->getY());
+#endif // RAI_FORTIFY_IF_NO_MOVE
 				}
 #else
 				pUnit->PushMission(CvTypes::getMISSION_MOVE_TO(), pTargetPlot->getX(), pTargetPlot->getY());
@@ -12235,7 +12307,11 @@ bool CvTacticalAI::MoveToUsingSafeEmbark(UnitHandle pUnit, CvPlot* pTargetPlot, 
 					if (!CheckAndExecuteParadrop(pUnit, pTargetPlot, iTurnsToTarget))
 					{
 						// No land path so just risk move to sea
+#ifdef RAI_FORTIFY_IF_NO_MOVE
+						ExecuteMoveToPlot(pUnit, pTargetPlot, false, MAX_INT);
+#else
 						pUnit->PushMission(CvTypes::getMISSION_MOVE_TO(), pTargetPlot->getX(), pTargetPlot->getY());
+#endif // RAI_FORTIFY_IF_NO_MOVE
 					}
 #else
 					// No land path so just risk move to sea
@@ -12254,7 +12330,11 @@ bool CvTacticalAI::MoveToUsingSafeEmbark(UnitHandle pUnit, CvPlot* pTargetPlot, 
 #ifdef AUI_TACTICAL_PARATROOPERS_PARADROP
 					if (!CheckAndExecuteParadrop(pUnit, pTargetPlot, iTurnsToBetterTarget))
 					{
-						pUnit->PushMission(CvTypes::getMISSION_MOVE_TO(), pTargetPlot->getX(), pTargetPlot->getY(), CvUnit::MOVEFLAG_STAY_ON_LAND);
+#ifdef RAI_FORTIFY_IF_NO_MOVE
+						ExecuteMoveToPlot(pUnit, pTargetPlot, false, MAX_INT);
+#else
+						pUnit->PushMission(CvTypes::getMISSION_MOVE_TO(), pTargetPlot->getX(), pTargetPlot->getY());
+#endif // RAI_FORTIFY_IF_NO_MOVE
 					}
 #else
 					pUnit->PushMission(CvTypes::getMISSION_MOVE_TO(), pTargetPlot->getX(), pTargetPlot->getY(), CvUnit::MOVEFLAG_STAY_ON_LAND);

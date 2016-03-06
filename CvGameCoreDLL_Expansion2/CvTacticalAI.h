@@ -953,6 +953,9 @@ private:
 	int ComputeTotalExpectedDamage(CvTacticalTarget* target, CvPlot* pTargetPlot);
 	int ComputeTotalExpectedBombardDamage(UnitHandle pTarget);
 	bool IsExpectedToDamageWithRangedAttack(UnitHandle pAttacker, CvPlot* pTarget);
+#ifdef RAI_NO_MELEE_SUICIDE
+	bool IsMeleeAttackCorrect(CvTacticalUnit* pUnit, CvPlot* pTargetPlot, bool bInflictWhatWeTake=true, double dSelfDamageRecklessness=120);
+#endif
 	bool MoveToEmptySpaceNearTarget(UnitHandle pUnit, CvPlot* pTargetPlot, bool bLand=true);
 	bool MoveToEmptySpaceTwoFromTarget(UnitHandle pUnit, CvPlot* pTargetPlot, bool bLand=true);
 #ifdef AUI_TACTICAL_FIX_MOVE_TO_USING_SAFE_EMBARK_SINGLE_PATHFINDER_CALL

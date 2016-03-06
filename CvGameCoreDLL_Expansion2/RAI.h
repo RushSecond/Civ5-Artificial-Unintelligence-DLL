@@ -22,6 +22,9 @@
 // AI no longer makes dumb melee attacks, taking more damage than dealing
 #define RAI_NO_MELEE_SUICIDE
 
+// AI now properly fortifies units that didnt move this turn
+#define RAI_FORTIFY_IF_NO_MOVE
+
 #define RAI_LOGGING_FIXES
 
 #endif
