@@ -2408,7 +2408,11 @@ void CvGrandStrategyAI::DoGuessOtherPlayersActiveGrandStrategy()
 					}
 					else if(strGrandStrategyName == "AIGRANDSTRATEGY_CULTURE")
 					{
+#ifdef RAI_GUESS_CULTURE_PRIORITY_COMPARES_TOURISM_TO_WORLD_CULTURE
+						iPriority = GetGuessOtherPlayerCulturePriority(eMajor);
+#else
 						iPriority = GetGuessOtherPlayerCulturePriority(eMajor, iWorldCultureAverage, iWorldTourismAverage);
+#endif
 					}
 					else if(strGrandStrategyName == "AIGRANDSTRATEGY_UNITED_NATIONS")
 					{
@@ -2515,6 +2519,65 @@ int CvGrandStrategyAI::GetGuessOtherPlayerConquestPriority(PlayerTypes ePlayer, 
 }
 
 /// Guess as to how much another Player is prioritizing Culture as his means of winning the game
+#ifdef RAI_GUESS_CULTURE_PRIORITY_COMPARES_TOURISM_TO_WORLD_CULTURE
+int CvGrandStrategyAI::GetGuessOtherPlayerCulturePriority(PlayerTypes ePlayer)
+{
+	VictoryTypes eVictory = (VictoryTypes) GC.getInfoTypeForString("VICTORY_CULTURAL", true);
+
+	// If Culture Victory isn't even available then don't bother with anything
+	if(eVictory == NO_VICTORY)
+	{
+		return -100;
+	}
+
+	CvTeam& pTeam = GET_TEAM(GetPlayer()->getTeam());
+
+	int iCulturePriority = 0;
+	
+	PlayerTypes eMajor;
+	int iCulture;
+	PlayerTypes eMajorHighestCulture = (PlayerTypes)0;
+	int iWorldHighestCulture = 0;
+
+	// Look at every Major we've met to find the one with the highest culture
+	for(int iMajorLoop = 0; iMajorLoop < MAX_MAJOR_CIVS; iMajorLoop++)
+	{
+		eMajor = (PlayerTypes) iMajorLoop;
+
+		// Don't look at the player in question
+		if(GET_PLAYER(eMajor).isAlive() && eMajor != ePlayer)
+		{
+			if(pTeam.isHasMet(GET_PLAYER(eMajor).getTeam()))
+			{
+				iCulture = (GET_PLAYER(eMajor)).GetJONSCultureEverGenerated();
+				if (iCulture > iWorldHighestCulture)
+				{
+					iWorldHighestCulture = iCulture;
+					eMajorHighestCulture = eMajor;
+				}
+			}
+		}
+	}
+
+	// Compare their Tourism to the world's highest culture
+	if(iWorldHighestCulture > 0)
+	{
+		// How close to influential?
+		int turnsToInfluential = GET_PLAYER(ePlayer).GetCulture()->GetTurnsToInfluential(eMajorHighestCulture);
+		if (turnsToInfluential < 40)
+			return 300;
+		else
+			iCulturePriority += 40 * 120 / turnsToInfluential;
+
+		// How much tourism total does he have on this guy
+
+		int iRatio = (GET_PLAYER(ePlayer).GetCulture()->GetInfluenceOn(eMajorHighestCulture) * 100) / iWorldHighestCulture;
+		iRatio *= /*160*/ GC.getAI_GS_TOURISM_RATIO_MULTIPLIER() / 100;
+		iCulturePriority += iRatio;
+	}
+	return iCulturePriority;
+}
+#else
 int CvGrandStrategyAI::GetGuessOtherPlayerCulturePriority(PlayerTypes ePlayer, int iWorldCultureAverage, int iWorldTourismAverage)
 {
 	VictoryTypes eVictory = (VictoryTypes) GC.getInfoTypeForString("VICTORY_CULTURAL", true);
@@ -2560,6 +2623,7 @@ int CvGrandStrategyAI::GetGuessOtherPlayerCulturePriority(PlayerTypes ePlayer, i
 
 	return iCulturePriority;
 }
+#endif // RAI_GUESS_CULTURE_PRIORITY_COMPARES_TOURISM_TO_WORLD_CULTURE
 
 /// Guess as to how much another Player is prioritizing the UN as his means of winning the game
 int CvGrandStrategyAI::GetGuessOtherPlayerUnitedNationsPriority(PlayerTypes ePlayer)

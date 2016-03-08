@@ -91,7 +91,11 @@ public:
 	void SetGuessOtherPlayerActiveGrandStrategy(PlayerTypes ePlayer, AIGrandStrategyTypes eGrandStrategy, GuessConfidenceTypes eGuessConfidence);
 
 	int GetGuessOtherPlayerConquestPriority(PlayerTypes ePlayer, int iWorldMilitaryAverage);
+#ifdef RAI_GUESS_CULTURE_PRIORITY_COMPARES_TOURISM_TO_WORLD_CULTURE
+	int GetGuessOtherPlayerCulturePriority(PlayerTypes ePlayer);
+#else
 	int GetGuessOtherPlayerCulturePriority(PlayerTypes ePlayer, int iWorldCultureAverage, int iWorldTourismAverage);
+#endif
 	int GetGuessOtherPlayerUnitedNationsPriority(PlayerTypes ePlayer);
 	int GetGuessOtherPlayerSpaceshipPriority(PlayerTypes ePlayer, int iWorldNumTechsAverage);
 
