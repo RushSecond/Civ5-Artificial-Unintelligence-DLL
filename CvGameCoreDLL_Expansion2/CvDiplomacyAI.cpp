@@ -3115,6 +3115,39 @@ MajorCivApproachTypes CvDiplomacyAI::GetBestApproachTowardsMajorCiv(PlayerTypes 
 		break;
 	}
 
+#ifdef RAI_AI_TRIES_TO_STOP_WIN_CONDITIONS
+	////////////////////////////////////
+	// VICTORY THREAT
+	////////////////////////////////////
+	if(GetVictoryDisputeLevel(ePlayer) > DISPUTE_LEVEL_NONE)
+	{
+		int iDisputeMod = GC.getGame().getHandicapInfo().getAIVictoryDisputeMod();
+
+		if (iDisputeMod > 0)
+		{
+			int iWarApproach = 0;
+
+			switch(GetVictoryDisputeLevel(ePlayer))
+			{
+			case DISPUTE_LEVEL_NONE:
+				break;
+			case DISPUTE_LEVEL_WEAK:
+				iWarApproach = /*5*/ GC.getAPPROACH_WAR_DISPUTE_LEVEL_WEAK();
+				break;
+			case DISPUTE_LEVEL_STRONG:
+				iWarApproach = /*15*/ GC.getAPPROACH_WAR_DISPUTE_LEVEL_STRONG();
+				break;
+			case DISPUTE_LEVEL_FIERCE:
+				iWarApproach = /*30*/ GC.getAPPROACH_WAR_DISPUTE_LEVEL_FIERCE();
+				break;
+			}
+
+			viApproachWeights[MAJOR_CIV_APPROACH_WAR] += (iWarApproach * iDisputeMod) / 100;
+			viApproachWeights[MAJOR_CIV_APPROACH_DECEPTIVE] += (iWarApproach * iDisputeMod) / 100;
+		}
+	}
+#endif
+
 	////////////////////////////////////
 	// NUKES
 	////////////////////////////////////
@@ -3311,6 +3344,28 @@ MajorCivApproachTypes CvDiplomacyAI::GetBestApproachTowardsMajorCiv(PlayerTypes 
 		viApproachWeights[MAJOR_CIV_APPROACH_GUARDED] *= /*100*/ GC.getAPPROACH_GUARDED_PROJECTION_UNKNOWN_PERCENT();
 		viApproachWeights[MAJOR_CIV_APPROACH_GUARDED] /= 100;
 		break;
+#ifdef RAI_ATTACKING_WEAK_PLAYER_DEPENDS_ON_WAR_APPROACH
+	case WAR_PROJECTION_GOOD:
+		viApproachWeights[MAJOR_CIV_APPROACH_WAR] *=
+			(100 + GetPersonalityMajorCivApproachBias(MAJOR_CIV_APPROACH_WAR) * /*6*/ GC.getAPPROACH_WAR_PROJECTION_GOOD_PERCENT());
+		viApproachWeights[MAJOR_CIV_APPROACH_WAR] /= 100;
+		viApproachWeights[MAJOR_CIV_APPROACH_DECEPTIVE] *=
+			(100 + GetPersonalityMajorCivApproachBias(MAJOR_CIV_APPROACH_WAR) * /*6*/ GC.getAPPROACH_WAR_PROJECTION_GOOD_PERCENT());
+		viApproachWeights[MAJOR_CIV_APPROACH_DECEPTIVE] /= 100;
+		viApproachWeights[MAJOR_CIV_APPROACH_GUARDED] *= /*80*/ GC.getAPPROACH_GUARDED_PROJECTION_GOOD_PERCENT();
+		viApproachWeights[MAJOR_CIV_APPROACH_GUARDED] /= 100;
+		break;
+	case WAR_PROJECTION_VERY_GOOD:
+		viApproachWeights[MAJOR_CIV_APPROACH_WAR] *= 
+			(100 + GetPersonalityMajorCivApproachBias(MAJOR_CIV_APPROACH_WAR) * /*12*/ GC.getAPPROACH_WAR_PROJECTION_VERY_GOOD_PERCENT());
+		viApproachWeights[MAJOR_CIV_APPROACH_WAR] /= 100;
+		viApproachWeights[MAJOR_CIV_APPROACH_DECEPTIVE] *=
+			(100 + GetPersonalityMajorCivApproachBias(MAJOR_CIV_APPROACH_WAR) * /*12*/ GC.getAPPROACH_WAR_PROJECTION_VERY_GOOD_PERCENT());
+		viApproachWeights[MAJOR_CIV_APPROACH_DECEPTIVE] /= 100;
+		viApproachWeights[MAJOR_CIV_APPROACH_GUARDED] *= /*60*/ GC.getAPPROACH_GUARDED_PROJECTION_VERY_GOOD_PERCENT();
+		viApproachWeights[MAJOR_CIV_APPROACH_GUARDED] /= 100;
+		break;
+#else
 	case WAR_PROJECTION_GOOD:
 		viApproachWeights[MAJOR_CIV_APPROACH_WAR] *= /*150*/ GC.getAPPROACH_WAR_PROJECTION_GOOD_PERCENT();
 		viApproachWeights[MAJOR_CIV_APPROACH_WAR] /= 100;
@@ -3327,6 +3382,7 @@ MajorCivApproachTypes CvDiplomacyAI::GetBestApproachTowardsMajorCiv(PlayerTypes 
 		viApproachWeights[MAJOR_CIV_APPROACH_GUARDED] *= /*60*/ GC.getAPPROACH_GUARDED_PROJECTION_VERY_GOOD_PERCENT();
 		viApproachWeights[MAJOR_CIV_APPROACH_GUARDED] /= 100;
 		break;
+#endif
 	}
 
 	////////////////////////////////////
@@ -5187,6 +5243,28 @@ void CvDiplomacyAI::DoUpdatePeaceTreatyWillingness()
 						}
 
 						// How much damage have we dished out?
+#ifdef RAI_DAMAGE_DEALT_PEACE_CHANGE
+						switch(GET_PLAYER(eLoopPlayer).GetDiplomacyAI()->GetWarDamageLevel(GetPlayer()->GetID()))
+						{
+						case WAR_DAMAGE_LEVEL_NONE:
+							iWillingToOfferScore -= /*0*/ GC.getPEACE_WILLINGNESS_OFFER_WAR_DAMAGE_DEALT_NONE();
+							break;
+						case WAR_DAMAGE_LEVEL_MINOR:
+							iWillingToOfferScore -= /*10*/ GC.getPEACE_WILLINGNESS_OFFER_WAR_DAMAGE_DEALT_MINOR();
+							break;
+						case WAR_DAMAGE_LEVEL_MAJOR:
+							iWillingToOfferScore -= /*20*/ GC.getPEACE_WILLINGNESS_OFFER_WAR_DAMAGE_DEALT_MAJOR();
+							break;
+						case WAR_DAMAGE_LEVEL_SERIOUS:
+							iWillingToOfferScore -= /*50*/ GC.getPEACE_WILLINGNESS_OFFER_WAR_DAMAGE_DEALT_SERIOUS();
+							break;
+						case WAR_DAMAGE_LEVEL_CRIPPLED:
+							iWillingToOfferScore -= /*80*/ GC.getPEACE_WILLINGNESS_OFFER_WAR_DAMAGE_DEALT_CRIPPLED();
+							break;
+						default:
+							break;
+						}
+#else
 						switch(GET_PLAYER(eLoopPlayer).GetDiplomacyAI()->GetWarDamageLevel(GetPlayer()->GetID()))
 						{
 						case WAR_DAMAGE_LEVEL_NONE:
@@ -5207,6 +5285,7 @@ void CvDiplomacyAI::DoUpdatePeaceTreatyWillingness()
 						default:
 							break;
 						}
+#endif
 
 						// Do the final assessment
 						if(iWillingToOfferScore >= /*180*/ GC.getPEACE_WILLINGNESS_OFFER_THRESHOLD_UN_SURRENDER())
@@ -6190,6 +6269,7 @@ int CvDiplomacyAI::GetWarScore(PlayerTypes ePlayer)
 		break;
 	}
 
+#ifndef RAI_WAR_SCORE_DOESNT_CONSIDER_PLAYER_SCORE
 	// the intangibles - our score vs their score
 	int iOurScore = GetPlayer()->GetScore();
 	iOurScore = iOurScore > 100 ? iOurScore : 100;
@@ -6198,6 +6278,7 @@ int CvDiplomacyAI::GetWarScore(PlayerTypes ePlayer)
 	int iRatio = ((iOurScore-iTheirScore) * 100) / (iOurScore>iTheirScore?iTheirScore:iOurScore);
 	iRatio = iRatio >= -50 ? (iRatio <= 50 ? iRatio : 50) : -50;
 	iWarScore += iRatio;
+#endif
 
 	// Decrease war score if we've been fighting for a long time - after 60 turns the effect is -20 on the WarScore
 	int iTurnsAtWar = GetPlayerNumTurnsAtWar(ePlayer);
@@ -7181,7 +7262,11 @@ void CvDiplomacyAI::DoUpdateWarmongerThreats()
 
 				if(iPlayersKilledPercent >= /*40*/ GC.getWARMONGER_THREAT_CRITICAL_PERCENT_THRESHOLD())
 					eThreatType = THREAT_CRITICAL;
+#ifdef RAI_WARMONGER_PERCENT_PLAYERS_KILLED_FIX
+				if(iPlayersKilledPercent >= /*25*/ GC.getWARMONGER_THREAT_SEVERE_PERCENT_THRESHOLD() && eThreatType < THREAT_SEVERE)
+#else			
 				if(iPlayersKilledPercent >= /*25*/ GC.getWARMONGER_THREAT_SEVERE_PERCENT_THRESHOLD())
+#endif
 					eThreatType = THREAT_SEVERE;
 			}
 
@@ -8479,6 +8564,21 @@ void CvDiplomacyAI::DoUpdateVictoryDisputeLevels()
 			// Minors can't really be an issue with Victory!
 			if(!GET_PLAYER(ePlayer).isMinorCiv())
 			{
+#ifdef RAI_AI_TRIES_TO_STOP_WIN_CONDITIONS
+				// Don't care WHAT the other player's strategy is, just how far along is he?
+				switch(GetPlayer()->GetGrandStrategyAI()->GetGuessOtherPlayerActiveGrandStrategyConfidence(ePlayer))
+				{
+				case GUESS_CONFIDENCE_POSITIVE:
+					eDisputeLevel = DISPUTE_LEVEL_FIERCE;
+					break;
+				case GUESS_CONFIDENCE_LIKELY:
+					eDisputeLevel = DISPUTE_LEVEL_STRONG;
+					break;
+				case GUESS_CONFIDENCE_UNSURE:
+					eDisputeLevel = DISPUTE_LEVEL_WEAK;
+					break;
+				}
+#else
 				iVictoryDisputeWeight = 0;
 
 				// Does the other player's (estimated) Grand Strategy match our own?
@@ -8536,6 +8636,7 @@ void CvDiplomacyAI::DoUpdateVictoryDisputeLevels()
 					eDisputeLevel = DISPUTE_LEVEL_STRONG;
 				else if(iVictoryDisputeWeight >= /*30*/ GC.getVICTORY_DISPUTE_WEAK_THRESHOLD())
 					eDisputeLevel = DISPUTE_LEVEL_WEAK;
+#endif // RAI_AI_TRIES_TO_STOP_WIN_CONDITIONS			
 			}
 
 			// Actually set the Level
@@ -18421,12 +18522,13 @@ int CvDiplomacyAI::GetCoopWarScore(PlayerTypes ePlayer, PlayerTypes eTargetPlaye
 		else if(eOpinionTowardsPlayer >= MAJOR_CIV_OPINION_FAVORABLE)
 			iWeight += 2;
 	}
-
+#ifndef RAI_COOP_WAR_USED_AGAINST_STRONGER_ENEMIES
 	// Weight for Approach
 	if(eApproachTowardsTarget == MAJOR_CIV_APPROACH_WAR)
 		iWeight += 5;
 	if(eApproachTowardsTarget == MAJOR_CIV_APPROACH_HOSTILE)
 		iWeight += 2;
+#endif
 
 	if (IsGoingForWorldConquest())
 	{
@@ -18474,6 +18576,26 @@ int CvDiplomacyAI::GetCoopWarScore(PlayerTypes ePlayer, PlayerTypes eTargetPlaye
 	}
 
 	// Weight for warmonger threat
+#ifdef RAI_COOP_WAR_USED_AGAINST_STRONGER_ENEMIES
+	switch(GetWarmongerThreat(eTargetPlayer))
+	{
+	case THREAT_NONE:
+		iWeight += /*-2*/ GC.getCOOPERATION_DESIRE_GAME_THREAT_NONE();
+		break;
+	case THREAT_MINOR:
+		iWeight += /*0*/ GC.getCOOPERATION_DESIRE_GAME_THREAT_MINOR();
+		break;
+	case THREAT_MAJOR:
+		iWeight += /*3*/ GC.getCOOPERATION_DESIRE_GAME_THREAT_MAJOR();
+		break;
+	case THREAT_SEVERE:
+		iWeight += /*7*/ GC.getCOOPERATION_DESIRE_GAME_THREAT_SEVERE();
+		break;
+	case THREAT_CRITICAL:
+		iWeight += /*13*/ GC.getCOOPERATION_DESIRE_GAME_THREAT_CRITICAL();
+		break;
+	}
+#else
 	switch(GetWarmongerThreat(eTargetPlayer))
 	{
 	case THREAT_MINOR:
@@ -18489,6 +18611,37 @@ int CvDiplomacyAI::GetCoopWarScore(PlayerTypes ePlayer, PlayerTypes eTargetPlaye
 		iWeight += 7;
 		break;
 	}
+#endif
+
+#ifdef RAI_AI_TRIES_TO_STOP_WIN_CONDITIONS
+	// Weight for victory threat
+	if(GetVictoryDisputeLevel(ePlayer) > DISPUTE_LEVEL_NONE)
+	{
+		int iDisputeMod = GC.getGame().getHandicapInfo().getAIVictoryDisputeMod(); // Range 0 - 100
+
+		if (iDisputeMod > 0)
+		{
+			int iWarApproach = 0;
+
+			switch(GetVictoryDisputeLevel(ePlayer))
+			{
+			case DISPUTE_LEVEL_NONE:
+				break;
+			case DISPUTE_LEVEL_WEAK:
+				iWarApproach = /*5*/ GC.getAPPROACH_WAR_DISPUTE_LEVEL_WEAK();
+				break;
+			case DISPUTE_LEVEL_STRONG:
+				iWarApproach = /*15*/ GC.getAPPROACH_WAR_DISPUTE_LEVEL_STRONG();
+				break;
+			case DISPUTE_LEVEL_FIERCE:
+				iWarApproach = /*30*/ GC.getAPPROACH_WAR_DISPUTE_LEVEL_FIERCE();
+				break;
+			}
+
+			iWeight += (iWarApproach * iDisputeMod) / 200;
+		}
+	}
+#endif
 
 	// If we're working with ePlayer then increase weight (if we're already willing to work Target this guy)
 	if(iWeight > 0 && IsDoFAccepted(ePlayer))

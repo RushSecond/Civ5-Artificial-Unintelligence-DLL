@@ -2820,6 +2820,9 @@ CvHandicapInfo::CvHandicapInfo() :
 	m_iAIStartingWorkerUnits(0),
 	m_iAIStartingExploreUnits(0),
 	m_iAIDeclareWarProb(0),
+#ifdef RAI_AI_TRIES_TO_STOP_WIN_CONDITIONS
+	m_iAIVictoryDisputeMod(0),
+#endif
 	m_iAIWorkRateModifier(0),
 	m_iAIUnhappinessPercent(0),
 	m_iAIGrowthPercent(0),
@@ -3056,6 +3059,12 @@ int CvHandicapInfo::getAIDeclareWarProb() const
 {
 	return m_iAIDeclareWarProb;
 }
+#ifdef RAI_AI_TRIES_TO_STOP_WIN_CONDITIONS
+int CvHandicapInfo::getAIVictoryDisputeMod() const
+{
+	return m_iAIVictoryDisputeMod;
+}
+#endif
 //------------------------------------------------------------------------------
 int CvHandicapInfo::getAIWorkRateModifier() const
 {
@@ -3219,6 +3228,9 @@ bool CvHandicapInfo::CacheResults(Database::Results& kResults, CvDatabaseUtility
 	m_iAIStartingWorkerUnits = kResults.GetInt("AIStartingWorkerUnits");
 	m_iAIStartingExploreUnits = kResults.GetInt("AIStartingExploreUnits");
 	m_iAIDeclareWarProb = kResults.GetInt("AIDeclareWarProb");
+#ifdef RAI_AI_TRIES_TO_STOP_WIN_CONDITIONS
+	m_iAIVictoryDisputeMod = kResults.GetInt("AIVictoryDisputeMod");
+#endif
 	m_iAIWorkRateModifier = kResults.GetInt("AIWorkRateModifier");
 	m_iAIUnhappinessPercent = kResults.GetInt("AIUnhappinessPercent");
 	m_iAIGrowthPercent = kResults.GetInt("AIGrowthPercent");

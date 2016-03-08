@@ -852,6 +852,9 @@ public:
 	int getAIStartingWorkerUnits() const;
 	int getAIStartingExploreUnits() const;
 	int getAIDeclareWarProb() const;
+#ifdef RAI_AI_TRIES_TO_STOP_WIN_CONDITIONS
+	int getAIVictoryDisputeMod() const;
+#endif
 	int getAIWorkRateModifier() const;
 	int getAIUnhappinessPercent() const;
 	int getAIGrowthPercent() const;
@@ -922,6 +925,9 @@ protected:
 	int m_iAIStartingWorkerUnits;
 	int m_iAIStartingExploreUnits;
 	int m_iAIDeclareWarProb;
+#ifdef RAI_AI_TRIES_TO_STOP_WIN_CONDITIONS
+	int m_iAIVictoryDisputeMod;
+#endif
 	int m_iAIWorkRateModifier;
 	int m_iAIUnhappinessPercent;
 	int m_iAIGrowthPercent;
