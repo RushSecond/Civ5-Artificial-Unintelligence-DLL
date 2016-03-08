@@ -8540,6 +8540,53 @@ void CvDiplomacyAI::SetVictoryDisputeLevel(PlayerTypes ePlayer, DisputeLevelType
 /// Updates what is our level of Dispute with a player is over Victory
 void CvDiplomacyAI::DoUpdateVictoryDisputeLevels()
 {
+#ifdef RAI_AI_TRIES_TO_STOP_WIN_CONDITIONS
+	PlayerTypes ePlayer;
+	DisputeLevelTypes eDisputeLevel;
+	AIGrandStrategyTypes eGrandStrategy;
+	CvAIGrandStrategyXMLEntry* pGrandStrategy;
+	CvString strGrandStrategyName;
+
+	// Loop through all (known) Players
+	for(int iPlayerLoop = 0; iPlayerLoop < MAX_CIV_PLAYERS; iPlayerLoop++)
+	{
+		ePlayer = (PlayerTypes) iPlayerLoop;
+
+		if(IsPlayerValid(ePlayer))
+		{
+			eDisputeLevel = DISPUTE_LEVEL_NONE;
+
+			// Minors can't really be an issue with Victory!
+			if(!GET_PLAYER(ePlayer).isMinorCiv())
+			{
+				eGrandStrategy = GetPlayer()->GetGrandStrategyAI()->GetGuessOtherPlayerActiveGrandStrategy(ePlayer);
+				pGrandStrategy = GetPlayer()->GetGrandStrategyAI()->GetAIGrandStrategies()->GetEntry(eGrandStrategy);
+				strGrandStrategyName = (CvString) pGrandStrategy->GetType();
+
+				// Warmonger penalties take care of conquest, so don't consider it here
+				if (strGrandStrategyName != "AIGRANDSTRATEGY_CONQUEST") 
+				{
+					// For the other three victories, how far along is he?
+					switch(GetPlayer()->GetGrandStrategyAI()->GetGuessOtherPlayerActiveGrandStrategyConfidence(ePlayer))
+					{
+					case GUESS_CONFIDENCE_POSITIVE:
+						eDisputeLevel = DISPUTE_LEVEL_FIERCE;
+						break;
+					case GUESS_CONFIDENCE_LIKELY:
+						eDisputeLevel = DISPUTE_LEVEL_STRONG;
+						break;
+					case GUESS_CONFIDENCE_UNSURE:
+						eDisputeLevel = DISPUTE_LEVEL_WEAK;
+						break;
+					}
+				}
+			}
+			// Actually set the Level
+			SetVictoryDisputeLevel(ePlayer, eDisputeLevel);
+		}
+	}
+}
+#else
 	AIGrandStrategyTypes eMyGrandStrategy = GetPlayer()->GetGrandStrategyAI()->GetActiveGrandStrategy();
 
 	PlayerTypes ePlayer;
@@ -8564,21 +8611,6 @@ void CvDiplomacyAI::DoUpdateVictoryDisputeLevels()
 			// Minors can't really be an issue with Victory!
 			if(!GET_PLAYER(ePlayer).isMinorCiv())
 			{
-#ifdef RAI_AI_TRIES_TO_STOP_WIN_CONDITIONS
-				// Don't care WHAT the other player's strategy is, just how far along is he?
-				switch(GetPlayer()->GetGrandStrategyAI()->GetGuessOtherPlayerActiveGrandStrategyConfidence(ePlayer))
-				{
-				case GUESS_CONFIDENCE_POSITIVE:
-					eDisputeLevel = DISPUTE_LEVEL_FIERCE;
-					break;
-				case GUESS_CONFIDENCE_LIKELY:
-					eDisputeLevel = DISPUTE_LEVEL_STRONG;
-					break;
-				case GUESS_CONFIDENCE_UNSURE:
-					eDisputeLevel = DISPUTE_LEVEL_WEAK;
-					break;
-				}
-#else
 				iVictoryDisputeWeight = 0;
 
 				// Does the other player's (estimated) Grand Strategy match our own?
@@ -8636,7 +8668,6 @@ void CvDiplomacyAI::DoUpdateVictoryDisputeLevels()
 					eDisputeLevel = DISPUTE_LEVEL_STRONG;
 				else if(iVictoryDisputeWeight >= /*30*/ GC.getVICTORY_DISPUTE_WEAK_THRESHOLD())
 					eDisputeLevel = DISPUTE_LEVEL_WEAK;
-#endif // RAI_AI_TRIES_TO_STOP_WIN_CONDITIONS			
 			}
 
 			// Actually set the Level
@@ -8644,6 +8675,7 @@ void CvDiplomacyAI::DoUpdateVictoryDisputeLevels()
 		}
 	}
 }
+#endif // RAI_AI_TRIES_TO_STOP_WIN_CONDITIONS			
 
 
 /// What is our guess as to the level of Dispute between two players over Victory?
