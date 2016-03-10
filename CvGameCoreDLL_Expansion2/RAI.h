@@ -29,6 +29,7 @@
 
 // More AI logging information for CvTactialAI.cpp
 #define RAI_LOGGING_FIXES
+#define PATH_FINDER_LOGGING
 
 //** DIPLOMACY AI **//
 
@@ -53,6 +54,22 @@
 // Starting at King difficulty, the AI will now want to attack a player who is close to winning by Science, Culture, or Diplomacy
 // This effect gets harsher each successive difficulty level
 #define RAI_AI_TRIES_TO_STOP_WIN_CONDITIONS
+
+
+
+//** UNIT AI **//
+
+// AI weighs bonus vs domain similarly now, no matter how much % it gives
+// AI is more likely to get higher levels of Shock/Drill, Accuracy/Barrage, etc and avoid flipping between them
+// AI is less likely to get Sentry promotion on units
+// AI values healing a little less
+#define RAI_PROMOTION_TWEAKS
+
+//** BUX FIXES **//
+
+// Units now properly update the AI's map on death;
+// This means AIs no longer act as though they are being ZOC'd by a unit they just killed
+#define RAI_DEAD_UNIT_UPDATES_MAP
 
 #endif
 

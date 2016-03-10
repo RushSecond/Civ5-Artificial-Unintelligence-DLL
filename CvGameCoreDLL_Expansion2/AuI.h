@@ -969,7 +969,7 @@ template<class T> inline T FastMin(const T& _Left, const T& _Right) { return (_D
 /// Fixes promotions that give a boost to fighting on a terrain type to not apply their value multiplication to other effects stacked with the promotion
 #define AUI_UNIT_PROMOTION_FIX_TERRAIN_BOOST
 /// Uses a different randomization algorithm and also uses the binomial RNG instead of the standard one if it's enabled
-#define AUI_UNIT_PROMOTION_TWEAKED_RANDOM (17)
+// #define AUI_UNIT_PROMOTION_TWEAKED_RANDOM (17)
 
 // Voting/League Stuff
 /// VITAL FOR MOST FUNCTIONS! Use double instead of int for certain variables (to retain information during division)

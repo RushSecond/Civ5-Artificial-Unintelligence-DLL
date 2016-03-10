@@ -1315,6 +1315,11 @@ void CvUnit::kill(bool bDelay, PlayerTypes ePlayer /*= NO_PLAYER*/)
 		LuaSupport::CallHook(pkScriptSystem, "UnitPrekill", args.get(), bResult);
 	}
 
+#ifdef RAI_DEAD_UNIT_UPDATES_MAP
+	if(pPlot)
+		pPlot->removeUnit(this, false);
+#endif
+
 	if(bDelay)
 	{
 		startDelayedDeath();
@@ -1415,8 +1420,10 @@ void CvUnit::kill(bool bDelay, PlayerTypes ePlayer /*= NO_PLAYER*/)
 	getCaptureDefinition(&kCaptureDef);
 
 	setXY(INVALID_PLOT_COORD, INVALID_PLOT_COORD, true);
+#ifndef RAI_DEAD_UNIT_UPDATES_MAP
 	if(pPlot)
 		pPlot->removeUnit(this, false);
+#endif
 
 	// Remove Resource Quantity from Used
 	for(int iResourceLoop = 0; iResourceLoop < GC.getNumResourceInfos(); iResourceLoop++)
@@ -21327,7 +21334,9 @@ int CvUnit::AI_promotionValue(PromotionTypes ePromotion)
 	int iFlavorRanged = pFlavorMgr->GetPersonalityIndividualFlavor((FlavorTypes)GC.getInfoTypeForString("FLAVOR_RANGED"));
 	int iFlavorRecon = pFlavorMgr->GetPersonalityIndividualFlavor((FlavorTypes)GC.getInfoTypeForString("FLAVOR_RECON"));
 	int iFlavorMobile = pFlavorMgr->GetPersonalityIndividualFlavor((FlavorTypes)GC.getInfoTypeForString("FLAVOR_MOBILE"));
+#ifndef RAI_PROMOTION_TWEAKS
 	int iFlavorNaval = pFlavorMgr->GetPersonalityIndividualFlavor((FlavorTypes)GC.getInfoTypeForString("FLAVOR_NAVAL"));
+#endif
 	int iFlavorAir = pFlavorMgr->GetPersonalityIndividualFlavor((FlavorTypes)GC.getInfoTypeForString("FLAVOR_AIR"));
 
 	// If we are damaged, insta heal is the way to go
@@ -21344,7 +21353,77 @@ int CvUnit::AI_promotionValue(PromotionTypes ePromotion)
 			dValue += 1000;   // Enough to lock this one up
 		}
 	}
+#ifdef RAI_PROMOTION_TWEAKS
+	dTemp = (double)pkPromotionInfo->GetOpenAttackPercent() / 3;
+	if(dTemp != 0)
+	{
+		iExtra = getExtraOpenAttackPercent();
+		dTemp *= (100 + iExtra * 10);
+		dTemp /= 100.0;
+		if(noDefensiveBonus())
+		{
+			dTemp *= 1.5;
+		}
+		dValue += dTemp + iFlavorOffense;
+	}
 
+	dTemp = (double)pkPromotionInfo->GetOpenDefensePercent() / 3;
+	if(dTemp != 0)
+	{
+		iExtra = getExtraOpenDefensePercent();
+		dTemp *= (100 + iExtra * 10);
+		dTemp /= 100.0;
+		if(noDefensiveBonus())
+		{
+			dTemp *= 1.5;
+		}
+		dValue += dTemp + iFlavorDefense;
+	}
+
+	dTemp = (double)pkPromotionInfo->GetRoughAttackPercent() / 3;
+	if(dTemp != 0)
+	{
+		iExtra = getExtraRoughAttackPercent();
+		dTemp *= (100 + iExtra * 10);
+		dTemp /= 100.0;
+		if(!noDefensiveBonus())
+		{
+			dTemp *= 1.5;
+		}
+		dValue += dTemp + iFlavorOffense;
+	}
+
+	dTemp = (double)pkPromotionInfo->GetRoughDefensePercent() / 3;
+	if(dTemp != 0)
+	{
+		iExtra = getExtraRoughDefensePercent();
+		dTemp *= (100 + iExtra * 10);
+		dTemp /= 100.0;
+		if(!noDefensiveBonus())
+		{
+			dTemp *= 1.5;
+		}
+		dValue += dTemp + iFlavorDefense;
+	}
+
+	dTemp = (double)pkPromotionInfo->GetOpenRangedAttackMod();
+	if(dTemp != 0 && isRanged())
+	{
+		iExtra = getExtraOpenRangedAttackMod();
+		dTemp *= (100 + iExtra * 3);
+		dTemp /= 100.0;
+		dValue += dTemp + iFlavorRanged * 2;
+	}
+
+	dTemp = (double)pkPromotionInfo->GetRoughRangedAttackMod();
+	if(dTemp != 0 && isRanged())
+	{
+		iExtra = getExtraRoughRangedAttackMod();
+		dTemp *= (100 + iExtra * 3);
+		dTemp /= 100.0;
+		dValue += dTemp + iFlavorRanged * 2;
+	}
+#else
 	dTemp = (double)pkPromotionInfo->GetOpenAttackPercent();
 	if(dTemp != 0)
 	{
@@ -21422,6 +21501,7 @@ int CvUnit::AI_promotionValue(PromotionTypes ePromotion)
 		}
 		dValue += dTemp + iFlavorRanged * 2;
 	}
+#endif //RAI_PROMOTION_TWEAKS
 
 	dTemp = (double)pkPromotionInfo->GetVisibilityChange();
 	if((AI_getUnitAIType() == UNITAI_EXPLORE_SEA) ||
@@ -21429,6 +21509,12 @@ int CvUnit::AI_promotionValue(PromotionTypes ePromotion)
 	{
 		dValue += dTemp * (50 + iFlavorRecon * 3);
 	}
+#ifdef RAI_PROMOTION_TWEAKS
+	else if (AI_getUnitAIType() == UNITAI_FAST_ATTACK || AI_getUnitAIType() == UNITAI_ATTACK_SEA)
+	{
+		dValue += dTemp * (20 + iFlavorRecon * 2);
+	}
+#endif
 	else
 	{
 		dValue += dTemp * (10 + iFlavorRecon * 2);
@@ -21440,7 +21526,13 @@ int CvUnit::AI_promotionValue(PromotionTypes ePromotion)
 		iExtra = getExtraCityAttackPercent();
 		dTemp *= (100 + iExtra * 2);
 		dTemp /= 100.0;
+#ifdef RAI_PROMOTION_TWEAKS
+		// Makes sure AI doesn't favor this for naval melee
+		if (AI_getUnitAIType() != UNITAI_ATTACK_SEA)
+			dValue += dTemp + iFlavorOffense * 2;
+#else
 		dValue += dTemp + iFlavorOffense * 2;
+#endif
 		if(isRanged())
 		{
 			dValue += iFlavorRanged * 2;
@@ -21489,7 +21581,11 @@ int CvUnit::AI_promotionValue(PromotionTypes ePromotion)
 	}
 	else
 	{
+#ifdef RAI_PROMOTION_TWEAKS
+		dValue += dTemp * (iFlavorOffense);
+#else
 		dValue += dTemp * (10 + iFlavorOffense * 2);
+#endif 
 	}
 
 	dTemp = (double)pkPromotionInfo->GetNeutralHealChange();
@@ -21504,7 +21600,11 @@ int CvUnit::AI_promotionValue(PromotionTypes ePromotion)
 	}
 	else
 	{
+#ifdef RAI_PROMOTION_TWEAKS
+		dValue += dTemp * (iFlavorRecon);
+#else
 		dValue += dTemp * (10 + iFlavorRecon * 2);
+#endif
 	}
 
 	dTemp = (double)pkPromotionInfo->GetFriendlyHealChange();
@@ -21519,7 +21619,11 @@ int CvUnit::AI_promotionValue(PromotionTypes ePromotion)
 	}
 	else
 	{
+#ifdef RAI_PROMOTION_TWEAKS
+		dValue += dTemp * (iFlavorDefense);
+#else
 		dValue += dTemp * (10 + iFlavorDefense * 2);
+#endif
 	}
 
 	dTemp = (double)pkPromotionInfo->GetAdjacentTileHealChange();
@@ -21534,7 +21638,11 @@ int CvUnit::AI_promotionValue(PromotionTypes ePromotion)
 	}
 	else
 	{
+#ifdef RAI_PROMOTION_TWEAKS
+		dValue += dTemp * (iFlavorDefense);
+#else
 		dValue += dTemp * (10 + iFlavorDefense * 2);
+#endif
 	}
 
 	if(pkPromotionInfo->IsAmphib())
@@ -21609,11 +21717,24 @@ int CvUnit::AI_promotionValue(PromotionTypes ePromotion)
 	{
 		dValue += ((2 * iFlavorOffense + iFlavorMobile) * maxMoves() / (double)GC.getMOVE_DENOMINATOR() * dTemp / 100.0);
 	}
-
+#ifdef RAI_PROMOTION_TWEAKS
+	if(GC.getPromotionInfo(ePromotion)->IsHealOutsideFriendly() && getDomainType() == DOMAIN_SEA)
+	{
+		if(AI_getUnitAIType() == UNITAI_ATTACK_SEA)
+		{
+			dValue += 10 + iFlavorOffense * 2;
+		}
+		else
+		{
+			dValue += iFlavorOffense * 2;
+		}
+	}
+#else
 	if(GC.getPromotionInfo(ePromotion)->IsHealOutsideFriendly() && getDomainType() == DOMAIN_SEA)
 	{
 		dValue += 50 + iFlavorNaval * 2;
 	}
+#endif // RAI_PROMOTION_TWEAKS
 
 	dTemp = (double)pkPromotionInfo->GetMovesChange();
 	if((AI_getUnitAIType() == UNITAI_ATTACK_SEA) ||
@@ -21627,6 +21748,14 @@ int CvUnit::AI_promotionValue(PromotionTypes ePromotion)
 	        (AI_getUnitAIType() == UNITAI_ATTACK) ||
 	        (AI_getUnitAIType() == UNITAI_PARADROP))
 	{
+#ifdef RAI_PROMOTION_TWEAKS
+		dValue += dTemp * (20 + iFlavorMobile);
+	}
+	else
+	{
+		dValue += dTemp * (10 + iFlavorMobile);
+	}
+#else
 #ifdef AUI_UNIT_PROMOTION_TWEAKED_MOVECHANGE
 		dValue += dTemp * (50 + iFlavorMobile * AUI_UNIT_PROMOTION_TWEAKED_MOVECHANGE);
 #else
@@ -21637,6 +21766,7 @@ int CvUnit::AI_promotionValue(PromotionTypes ePromotion)
 	{
 		dValue += dTemp * (30 + iFlavorMobile * 2);
 	}
+#endif
 
 	if(pkPromotionInfo->IsAlwaysHeal())
 	{
@@ -21719,6 +21849,15 @@ int CvUnit::AI_promotionValue(PromotionTypes ePromotion)
 		        (AI_getUnitAIType() == UNITAI_ESCORT_SEA) ||
 		        (AI_getUnitAIType() == UNITAI_PARADROP))
 		{
+#ifdef RAI_PROMOTION_TWEAKS
+			dValue += 20 + (iFlavorMobile + iFlavorOffense) / 2;
+		}
+		else
+		{
+			dValue += 10 + (iFlavorMobile + iFlavorOffense) / 2;
+		}
+	}
+#else
 #ifdef AUI_UNIT_PROMOTION_TWEAKED_MOVE_AFTER_ATTACK
 			dValue += 30 + (iFlavorMobile + iFlavorOffense) * AUI_UNIT_PROMOTION_TWEAKED_MOVE_AFTER_ATTACK;
 #else
@@ -21730,6 +21869,7 @@ int CvUnit::AI_promotionValue(PromotionTypes ePromotion)
 			dValue += 10 + (iFlavorMobile + iFlavorOffense) * 2;
 		}
 	}
+#endif
 
 	dTemp = (double)pkPromotionInfo->GetExtraAttacks();
 	if(dTemp != 0)
@@ -22005,7 +22145,17 @@ int CvUnit::AI_promotionValue(PromotionTypes ePromotion)
 			}
 		}
 	}
+#ifdef RAI_PROMOTION_TWEAKS
+	for(iI = 0; iI < NUM_DOMAIN_TYPES; iI++)
+	{
+		dTemp = ((pkPromotionInfo->GetDomainModifierPercent(iI) > 0) ? 1.0 : 0.0);
 
+		iExtra = (getExtraDomainModifier((DomainTypes)iI) > 0 ? 60 : 0);
+		dTemp *= (100 + iExtra);
+		dTemp /= 100.0;
+		dValue += dTemp * (15 + (iFlavorOffense + iFlavorDefense) / 2);
+	}
+#else
 	for(iI = 0; iI < NUM_DOMAIN_TYPES; iI++)
 	{
 		dTemp = (double)pkPromotionInfo->GetDomainModifierPercent(iI);
@@ -22023,6 +22173,7 @@ int CvUnit::AI_promotionValue(PromotionTypes ePromotion)
 			dValue += (dTemp / 2.0);
 		}
 	}
+#endif //RAI_PROMOTION_TWEAKS
 
 #ifdef AUI_UNIT_PROMOTION_TWEAKED_RANDOM
 	if(dValue > 0)
@@ -22037,9 +22188,9 @@ int CvUnit::AI_promotionValue(PromotionTypes ePromotion)
 	// Randomizer borrowed from CvReligionAI::ScoreBelief()
 	dValue *= (1 + pow((double)GC.getGame().getJonRandNumBinom(257, "Promotion score randomizer.") / 128.0 - 1.0, 3.0));
 #else
-	if(fValue > 0)
+	if(dValue > 0)
 	{
-		fValue += GC.getGame().getJonRandNum(15, "AI Promote");
+		dValue += GC.getGame().getJonRandNum(15, "AI Promote");
 	}
 #endif // AUI_UNIT_PROMOTION_TWEAKED_RANDOM
 

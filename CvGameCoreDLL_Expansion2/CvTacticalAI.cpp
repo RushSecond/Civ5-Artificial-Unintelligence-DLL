@@ -766,6 +766,15 @@ void CvTacticalAI::CombatResolved(void* pAttacker, bool bVictorious, bool bCityA
 		pUnit = UnitHandle((CvUnit*)pAttacker);
 	}
 
+#ifdef RAI_DONT_WASTE_COMBAT_ACTIONS
+	// Process it here
+	if (pUnit)
+	{
+		pUnit->SetTacticalAIPlot(NULL);
+		UnitProcessed(pUnit->GetID());
+	}
+#endif
+
 	if(m_QueuedAttacks.size() > 0)
 	{
 		std::list<CvQueuedAttack>::iterator nextToErase, nextInList;
@@ -6739,6 +6748,10 @@ void CvTacticalAI::ExecuteAttack(CvTacticalTarget* pTarget, CvPlot* pTargetPlot,
 
 	// How much damage do we still need to inflict?
 	int iDamageRemaining = (pTarget->GetAuxIntData() * (100 + GC.getAI_TACTICAL_OVERKILL_PERCENT())) / 100;
+#ifdef RAI_DONT_WASTE_COMBAT_ACTIONS
+	// How much damage is queued up by melee attacks?
+	int iMeleeDamageQueued = 0;
+#endif
 
 // This actually should be unnessary, since if I did everything else right,
 // ExecuteAttack would only be called if the plot is visible at SOME POINT this turn
@@ -6849,7 +6862,11 @@ void CvTacticalAI::ExecuteAttack(CvTacticalTarget* pTarget, CvPlot* pTargetPlot,
 	bool bSeaMeleeBlocked = false;
 
 	// First loop for melee units just to reposition.
+#ifdef RAI_DONT_WASTE_COMBAT_ACTIONS
+	for (unsigned int iI = 0; iI < m_CurrentMoveUnits.size() && iDamageRemaining > iMeleeDamageQueued; iI++)
+#else
 	for (unsigned int iI = 0; iI < m_CurrentMoveUnits.size(); iI++)
+#endif
 	{
 #ifdef RAI_NO_MELEE_SUICIDE
 		if (IsMeleeAttackCorrect(&(m_CurrentMoveUnits[iI]), pTargetPlot, bInflictWhatWeTake, dSelfDamageRecklessness))			
@@ -6890,6 +6907,9 @@ void CvTacticalAI::ExecuteAttack(CvTacticalTarget* pTarget, CvPlot* pTargetPlot,
 									pUnit->PushMission(CvTypes::getMISSION_MOVE_TO(), (*it)->getX(), (*it)->getY());
 									plotList.erase(it);
 									unitHasMoved = true;
+#ifdef RAI_DONT_WASTE_COMBAT_ACTIONS
+									iMeleeDamageQueued += m_CurrentMoveUnits[iI].GetExpectedTargetDamage();
+#endif
 									break;
 								}
 							}
@@ -6915,6 +6935,9 @@ void CvTacticalAI::ExecuteAttack(CvTacticalTarget* pTarget, CvPlot* pTargetPlot,
 														pUnit->PushMission(CvTypes::getMISSION_MOVE_TO(), (*it)->getX(), (*it)->getY());
 														plotList.erase(it);
 														unitHasMoved = true;
+#ifdef RAI_DONT_WASTE_COMBAT_ACTIONS
+														iMeleeDamageQueued += m_CurrentMoveUnits[iI].GetExpectedTargetDamage();
+#endif
 														break;
 													}
 												}
@@ -6986,7 +7009,11 @@ void CvTacticalAI::ExecuteAttack(CvTacticalTarget* pTarget, CvPlot* pTargetPlot,
 	}
 
 	// Second loop is ranged units only
+#ifdef RAI_DONT_WASTE_COMBAT_ACTIONS
+	for (unsigned int iI = 0; iI < m_CurrentMoveUnits.size() && iDamageRemaining > iMeleeDamageQueued; iI++)
+#else
 	for (unsigned int iI = 0; iI < m_CurrentMoveUnits.size() && iDamageRemaining > 0; iI++)
+#endif
 	{
 #ifdef RAI_NO_MELEE_SUICIDE
 		if (IsMeleeAttackCorrect(&(m_CurrentMoveUnits[iI]), pTargetPlot, bInflictWhatWeTake, dSelfDamageRecklessness))
@@ -7098,9 +7125,10 @@ void CvTacticalAI::ExecuteAttack(CvTacticalTarget* pTarget, CvPlot* pTargetPlot,
 #ifdef AUI_TACTICAL_FREE_PILLAGE
 								CheckAndExecuteFreePillageMoves(pUnit);
 #endif // AUI_TACTICAL_FREE_PILLAGE
-
+#ifndef RAI_DONT_WASTE_COMBAT_ACTIONS
 								pUnit->SetTacticalAIPlot(NULL);
 								UnitProcessed(m_CurrentMoveUnits[iI].GetID());
+#endif
 							}
 						}
 						else if(MoveToEmptySpaceTwoFromTarget(pUnit, pTargetPlot, (pUnit->getDomainType() == DOMAIN_LAND)))
@@ -7205,9 +7233,10 @@ void CvTacticalAI::ExecuteAttack(CvTacticalTarget* pTarget, CvPlot* pTargetPlot,
 							if (pUnit->isNoCapture() && pTarget->GetTargetType() == AI_TACTICAL_TARGET_CITY && iDamageRemaining < 1)
 								iDamageRemaining = 1;
 #endif // AUI_TACTICAL_FIX_NO_CAPTURE
-
+#ifndef RAI_DONT_WASTE_COMBAT_ACTIONS
 							pUnit->SetTacticalAIPlot(NULL);
 							UnitProcessed(m_CurrentMoveUnits[iI].GetID(), false /*bMarkTacticalMap*/);
+#endif
 						}
 					}
 				}
@@ -7248,6 +7277,9 @@ void CvTacticalAI::ExecuteAttack(CvTacticalTarget* pTarget, CvPlot* pTargetPlot,
 		}
 	}
 
+#ifdef RAI_DONT_WASTE_COMBAT_ACTIONS
+	iMeleeDamageQueued = 0;
+#endif
 	// Fourth loop for melee units that were previously blocked
 	for (unsigned int iI = 0; iI < apMeleeUnitsBlocked.size() && iDamageRemaining > 0; iI++)
 	{
@@ -7277,6 +7309,9 @@ void CvTacticalAI::ExecuteAttack(CvTacticalTarget* pTarget, CvPlot* pTargetPlot,
 							pUnit->PushMission(CvTypes::getMISSION_MOVE_TO(), (*it)->getX(), (*it)->getY());
 							plotList.erase(it);
 							unitHasMoved = true;
+#ifdef RAI_DONT_WASTE_COMBAT_ACTIONS
+							iMeleeDamageQueued += m_CurrentMoveUnits[iI].GetExpectedTargetDamage();
+#endif
 							break;
 						}
 					}
@@ -7299,6 +7334,9 @@ void CvTacticalAI::ExecuteAttack(CvTacticalTarget* pTarget, CvPlot* pTargetPlot,
 											pUnit->PushMission(CvTypes::getMISSION_MOVE_TO(), (*it)->getX(), (*it)->getY());
 											plotList.erase(it);
 											unitHasMoved = true;
+#ifdef RAI_DONT_WASTE_COMBAT_ACTIONS
+											iMeleeDamageQueued += m_CurrentMoveUnits[iI].GetExpectedTargetDamage();
+#endif
 											if (GC.getLogging() && GC.getAILogging())
 											{
 												CvString strMsg;
@@ -7406,9 +7444,10 @@ void CvTacticalAI::ExecuteAttack(CvTacticalTarget* pTarget, CvPlot* pTargetPlot,
 							if (pUnit->isNoCapture() && pTarget->GetTargetType() == AI_TACTICAL_TARGET_CITY && iDamageRemaining < 1)
 								iDamageRemaining = 1;
 #endif // AUI_TACTICAL_FIX_NO_CAPTURE
-
+#ifndef RAI_DONT_WASTE_COMBAT_ACTIONS
 							pUnit->SetTacticalAIPlot(NULL);
 							UnitProcessed(m_CurrentMoveUnits[iI].GetID(), false /*bMarkTacticalMap*/);
+#endif
 						}
 					}
 				}
@@ -10767,15 +10806,6 @@ bool CvTacticalAI::FindUnitsWithinStrikingDistance(CvPlot* pTarget, int iNumTurn
 		pLoopUnit = m_pPlayer->getUnit(*it);
 		if(pLoopUnit)
 		{
-#ifdef RAI_LOGGING_FIXES
-			if (GC.getLogging() && GC.getAILogging())
-			{
-				CvString strLogString;
-				strLogString.Format("Possible Attacker: %s At X: %d, At Y: %d",
-					GC.getUnitInfo(pLoopUnit->getUnitType())->GetDescription(), pLoopUnit->getX(), pLoopUnit->getY());
-				LogTacticalMessage(strLogString);
-			}
-#endif
 			if(!bNavalOnly || pLoopUnit->getDomainType() == DOMAIN_SEA)
 			{
 				// don't use non-combat units
@@ -10830,6 +10860,15 @@ bool CvTacticalAI::FindUnitsWithinStrikingDistance(CvPlot* pTarget, int iNumTurn
 						iAttackStrength *= 3;
 					}
 				}
+#ifdef RAI_LOGGING_FIXES
+				if (GC.getLogging() && GC.getAILogging())
+				{
+					CvString strLogString;
+					strLogString.Format("Possible Attacker: %s At X: %d, At Y: %d",
+						GC.getUnitInfo(pLoopUnit->getUnitType())->GetDescription(), pLoopUnit->getX(), pLoopUnit->getY());
+					LogTacticalMessage(strLogString);
+				}
+#endif
 #ifdef AUI_TACTICAL_FIX_FIND_UNITS_WITHIN_STRIKING_DISTANCE_RANGED_LONG_DISTANCE
 				bIsRangedDamage = false;
 #endif // AUI_TACTICAL_FIX_FIND_UNITS_WITHIN_STRIKING_DISTANCE_RANGED_LONG_DISTANCE

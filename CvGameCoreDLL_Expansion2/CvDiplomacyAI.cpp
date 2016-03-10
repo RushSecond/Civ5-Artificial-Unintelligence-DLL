@@ -8560,26 +8560,29 @@ void CvDiplomacyAI::DoUpdateVictoryDisputeLevels()
 			if(!GET_PLAYER(ePlayer).isMinorCiv())
 			{
 				eGrandStrategy = GetPlayer()->GetGrandStrategyAI()->GetGuessOtherPlayerActiveGrandStrategy(ePlayer);
-				pGrandStrategy = GetPlayer()->GetGrandStrategyAI()->GetAIGrandStrategies()->GetEntry(eGrandStrategy);
-				strGrandStrategyName = (CvString) pGrandStrategy->GetType();
-
-				// Warmonger penalties take care of conquest, so don't consider it here
-				if (strGrandStrategyName != "AIGRANDSTRATEGY_CONQUEST") 
+				if (eGrandStrategy != NO_AIGRANDSTRATEGY)
 				{
-					// For the other three victories, how far along is he?
-					switch(GetPlayer()->GetGrandStrategyAI()->GetGuessOtherPlayerActiveGrandStrategyConfidence(ePlayer))
+					pGrandStrategy = GC.getAIGrandStrategyInfo(eGrandStrategy);
+					strGrandStrategyName = (CvString) pGrandStrategy->GetType();
+
+					// Warmonger penalties take care of conquest, so don't consider it here
+					if (strGrandStrategyName != "AIGRANDSTRATEGY_CONQUEST") 
 					{
-					case GUESS_CONFIDENCE_POSITIVE:
-						eDisputeLevel = DISPUTE_LEVEL_FIERCE;
-						break;
-					case GUESS_CONFIDENCE_LIKELY:
-						eDisputeLevel = DISPUTE_LEVEL_STRONG;
-						break;
-					case GUESS_CONFIDENCE_UNSURE:
-						eDisputeLevel = DISPUTE_LEVEL_WEAK;
-						break;
+						// For the other three victories, how far along is he?
+						switch(GetPlayer()->GetGrandStrategyAI()->GetGuessOtherPlayerActiveGrandStrategyConfidence(ePlayer))
+						{
+						case GUESS_CONFIDENCE_POSITIVE:
+							eDisputeLevel = DISPUTE_LEVEL_FIERCE;
+							break;
+						case GUESS_CONFIDENCE_LIKELY:
+							eDisputeLevel = DISPUTE_LEVEL_STRONG;
+							break;
+						case GUESS_CONFIDENCE_UNSURE:
+							eDisputeLevel = DISPUTE_LEVEL_WEAK;
+							break;
+						}
 					}
-				}
+				}			
 			}
 			// Actually set the Level
 			SetVictoryDisputeLevel(ePlayer, eDisputeLevel);
