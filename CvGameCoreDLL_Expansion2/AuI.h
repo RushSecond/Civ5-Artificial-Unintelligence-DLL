@@ -232,6 +232,8 @@ template<class T> inline T FastMin(const T& _Left, const T& _Right) { return (_D
 #define AUI_DANGER_PLOTS_ADD_DANGER_CONSIDER_TERRAIN_STRENGTH_MODIFICATION
 /// Counts air unit strength into danger (commented out for now)
 //#define AUI_DANGER_PLOTS_COUNT_AIR_UNITS
+/// Plots that are under immediate threat by an even number of units will properly return that the plot is under immediate threat
+#define AUI_DANGER_PLOTS_FIX_ADD_DANGER_WITHIN_ONE_MOVE
 
 // DiplomacyAI Stuff
 /// If the first adjusted value is out of bounds, keep rerolling with the amount with which it is out of bounds until we remain in bounds
@@ -409,11 +411,11 @@ template<class T> inline T FastMin(const T& _Left, const T& _Right) { return (_D
 /// When scoring targets by distance, use a continuum system instead of different tiers
 #define AUI_MILITARY_TARGET_WEIGHT_DISTANCE_CONTINUUM
 /// Applies flavor and current needs when checking the economic value of a target city
-#define AUI_MILITARY_TARGET_WEIGHT_ECONOMIC_FLAVORED
+// #define AUI_MILITARY_TARGET_WEIGHT_ECONOMIC_FLAVORED
 /// Fixes bad code for visible barbarian units adding to "barbarian threat" value
 #define AUI_MILITARY_FIX_BARBARIAN_THREAT
 /// Adds barbarian threat to fMultiplier in addition to highest player threat and offense/defense flavors
-#define AUI_MILITARY_UNITS_WANTED_ADD_BARBARIAN_THREAT
+// #define AUI_MILITARY_UNITS_WANTED_ADD_BARBARIAN_THREAT
 /// Squares the value added by player threat (and barbarian threat, if it's enabled) to fMultiplier
 #define AUI_MILITARY_UNITS_WANTED_SQUARE_THREATS
 /// Tweaks Disband Obsolete Units function to work more often, more intelligently, and also when player does not have negative GPT but still has obsolete units
