@@ -2491,7 +2491,18 @@ void CvAIOperationBasicCityAttack::Write(FDataStream& kStream) const
 
 MultiunitFormationTypes CvAIOperationBasicCityAttack::GetFormation() const
 {
+#ifdef RAI_USE_BASIC_CITY_ATTACK_FORCE_IN_CLASSICAL_ERA
+	MultiunitFormationTypes eFormation = MUFORMATION_BASIC_CITY_ATTACK_FORCE;
+
+	if (GC.getGame().getHandicapInfo().GetID() > 4 &&
+		!(GC.getMap().GetAIMapHint() & 1) && (int)GET_PLAYER(m_eOwner).GetCurrentEra() <= GC.getInfoTypeForString("ERA_CLASSICAL"))
+	{
+		eFormation = MUFORMATION_BIGGER_CITY_ATTACK_FORCE;
+	}
+	return eFormation;
+#else
 	return (GC.getGame().getHandicapInfo().GetID() > 4 && !(GC.getMap().GetAIMapHint() & 1)) ? MUFORMATION_BIGGER_CITY_ATTACK_FORCE : MUFORMATION_BASIC_CITY_ATTACK_FORCE;
+#endif
 }
 
 /// Same as default version except if just gathered forces, check to see if a better target has presented itself
@@ -2589,7 +2600,18 @@ CvAIOperationSneakCityAttack::CvAIOperationSneakCityAttack()
 }
 MultiunitFormationTypes CvAIOperationSneakCityAttack::GetFormation() const
 {
+#ifdef RAI_USE_BASIC_CITY_ATTACK_FORCE_IN_CLASSICAL_ERA
+	MultiunitFormationTypes eFormation = MUFORMATION_BASIC_CITY_ATTACK_FORCE;
+
+	if (GC.getGame().getHandicapInfo().GetID() > 4 &&
+		!(GC.getMap().GetAIMapHint() & 1) && (int)GET_PLAYER(m_eOwner).GetCurrentEra() <= GC.getInfoTypeForString("ERA_CLASSICAL"))
+	{
+		eFormation = MUFORMATION_BIGGER_CITY_ATTACK_FORCE;
+	}
+	return eFormation;
+#else
 	return (GC.getGame().getHandicapInfo().GetID() > 4 && !(GC.getMap().GetAIMapHint() & 1)) ? MUFORMATION_BIGGER_CITY_ATTACK_FORCE : MUFORMATION_BASIC_CITY_ATTACK_FORCE;
+#endif
 }
 
 CvAIOperationQuickSneakCityAttack::CvAIOperationQuickSneakCityAttack()
@@ -2615,7 +2637,18 @@ CvAIOperationCityStateAttack::CvAIOperationCityStateAttack()
 }
 MultiunitFormationTypes CvAIOperationCityStateAttack::GetFormation() const
 {
+#ifdef RAI_USE_BASIC_CITY_ATTACK_FORCE_IN_CLASSICAL_ERA
+	MultiunitFormationTypes eFormation = MUFORMATION_CITY_STATE_ATTACK_FORCE;
+
+	if (GC.getGame().getHandicapInfo().GetID() > 4 &&
+		!(GC.getMap().GetAIMapHint() & 1) && (int)GET_PLAYER(m_eOwner).GetCurrentEra() <= GC.getInfoTypeForString("ERA_CLASSICAL"))
+	{
+		eFormation = MUFORMATION_BIGGER_CITY_ATTACK_FORCE;
+	}
+	return eFormation;
+#else
 	return (GC.getGame().getHandicapInfo().GetID() > 4 && !(GC.getMap().GetAIMapHint() & 1)) ? MUFORMATION_BIGGER_CITY_ATTACK_FORCE : MUFORMATION_CITY_STATE_ATTACK_FORCE;
+#endif
 }
 
 ////////////////////////////////////////////////////////////////////////////////

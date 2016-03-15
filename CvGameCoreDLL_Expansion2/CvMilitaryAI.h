@@ -392,6 +392,9 @@ bool IsTestStrategy_NeedAirCarriers(CvPlayer* pPlayer);
 
 // Functions that evaluate which operation to launch
 int ComputeRecommendedNavySize(CvPlayer* pPlayer);
+#ifdef RAI_USE_BASIC_CITY_ATTACK_FORCE_IN_CLASSICAL_ERA
+MultiunitFormationTypes CityAttackFormation(CvPlayer* pPlayer);
+#endif
 int NumberOfFillableSlots(CvPlayer* pPlayer, MultiunitFormationTypes formation, bool bRequiresNavalMoves=false, int* piNumberSlotsRequired=NULL, int* piNumberLandReservesUsed=NULL);
 UnitAITypes FirstSlotCityCanFill(CvPlayer* pPlayer, MultiunitFormationTypes formation, bool bRequiresNavalMoves, bool bAtCoastalCity, bool bSecondaryUnit);
 }

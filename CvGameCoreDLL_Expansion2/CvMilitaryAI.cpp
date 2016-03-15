@@ -544,7 +544,12 @@ bool CvMilitaryAI::RequestSneakAttack(PlayerTypes eEnemy)
 		}
 		else
 		{
+#ifdef RAI_USE_BASIC_CITY_ATTACK_FORCE_IN_CLASSICAL_ERA
+			MultiunitFormationTypes eFormation = MilitaryAIHelpers::CityAttackFormation(m_pPlayer);
+			if(IsAttackReady(eFormation, AI_OPERATION_SNEAK_CITY_ATTACK))
+#else
 			if(IsAttackReady((GC.getGame().getHandicapInfo().GetID() > 4 && !(GC.getMap().GetAIMapHint() & 1)) ? MUFORMATION_BIGGER_CITY_ATTACK_FORCE : MUFORMATION_BASIC_CITY_ATTACK_FORCE, AI_OPERATION_SNEAK_CITY_ATTACK))
+#endif
 			{
 				pOperation = m_pPlayer->addAIOperation(AI_OPERATION_SNEAK_CITY_ATTACK, eEnemy, target.m_pTargetCity->getArea(), target.m_pTargetCity, target.m_pMusterCity);
 				if(pOperation != NULL && !pOperation->ShouldAbort())
@@ -729,7 +734,12 @@ bool CvMilitaryAI::RequestSpecificAttack(CvMilitaryTarget kTarget, int iNumUnits
 		}
 		else
 		{
+#ifdef RAI_USE_BASIC_CITY_ATTACK_FORCE_IN_CLASSICAL_ERA
+			MultiunitFormationTypes eFormation = MilitaryAIHelpers::CityAttackFormation(m_pPlayer);
+			iFilledSlots = MilitaryAIHelpers::NumberOfFillableSlots(m_pPlayer, eFormation, false, &iNumRequiredSlots, &iLandReservesUsed);
+#else
 			iFilledSlots = MilitaryAIHelpers::NumberOfFillableSlots(m_pPlayer,(GC.getGame().getHandicapInfo().GetID() > 4 && !(GC.getMap().GetAIMapHint() & 1)) ? MUFORMATION_BIGGER_CITY_ATTACK_FORCE : MUFORMATION_BASIC_CITY_ATTACK_FORCE, false, &iNumRequiredSlots, &iLandReservesUsed);
+#endif		
 			if((iNumRequiredSlots - iFilledSlots) <= iNumUnitsWillingToBuild && iLandReservesUsed <= GetLandReservesAvailable())
 			{
 				pOperation = m_pPlayer->addAIOperation(AI_OPERATION_BASIC_CITY_ATTACK, kTarget.m_pTargetCity->getOwner(), kTarget.m_pTargetCity->getArea(), kTarget.m_pTargetCity, kTarget.m_pMusterCity);
@@ -1346,6 +1356,12 @@ int CvMilitaryAI::ScoreTarget(CvMilitaryTarget& target, AIOperationTypes eAIOper
 	{
 		uliRtnValue = uliRtnValue * uliRtnValue * uliRtnValue;
 	}
+#ifdef RAI_MILITARY_TARGET_WEIGHT_DISTANCE_SQUARED
+	else
+	{
+		uliRtnValue = uliRtnValue * uliRtnValue;
+	}
+#endif
 
 	CityAttackApproaches eApproaches;
 	int iApproachMultiplier = 0;
@@ -1450,6 +1466,20 @@ int CvMilitaryAI::ScoreTarget(CvMilitaryTarget& target, AIOperationTypes eAIOper
 
 	uliRtnValue = (unsigned long)(uliRtnValue * (dEconomicValue / 10.0));
 #else
+#ifdef RAI_MILITARY_TARGET_WEIGHT_ECONOMIC_TWEAKS
+	unsigned long int iEconomicValue = 10 + (target.m_pTargetCity->getPopulation() * 3);
+	// TODO: unhardcode this
+	// filter out all but the most productive
+	iEconomicValue += target.m_pTargetCity->getYieldRateTimes100(YIELD_FOOD, false) * GC.getAI_CITIZEN_VALUE_FOOD() / 10;
+	iEconomicValue += target.m_pTargetCity->getYieldRateTimes100(YIELD_PRODUCTION, false) * GC.getAI_CITIZEN_VALUE_PRODUCTION() / 10;
+	iEconomicValue += target.m_pTargetCity->getYieldRateTimes100(YIELD_SCIENCE, false) * GC.getAI_CITIZEN_VALUE_SCIENCE() / 10;
+	iEconomicValue += target.m_pTargetCity->getYieldRateTimes100(YIELD_GOLD, false) * GC.getAI_CITIZEN_VALUE_GOLD() / 10;
+	iEconomicValue += target.m_pTargetCity->getYieldRateTimes100(YIELD_CULTURE, false) * GC.getAI_CITIZEN_VALUE_CULTURE() / 10;
+	iEconomicValue += target.m_pTargetCity->getYieldRateTimes100(YIELD_FAITH, false) * GC.getAI_CITIZEN_VALUE_FAITH() / 10;
+	uliRtnValue *= iEconomicValue;
+
+	uliRtnValue /= 10;
+#else
 	unsigned long int iEconomicValue = 1 + (target.m_pTargetCity->getPopulation() / 3);
 	// TODO: unhardcode this
 	// filter out all but the most productive
@@ -1462,6 +1492,7 @@ int CvMilitaryAI::ScoreTarget(CvMilitaryTarget& target, AIOperationTypes eAIOper
 	uliRtnValue *= iEconomicValue;
 
 	uliRtnValue /= 10;
+#endif // RAI_MILITARY_TARGET_WEIGHT_ECONOMIC_TWEAKS
 #endif // AUI_MILITARY_TARGET_WEIGHT_ECONOMIC_FLAVORED
 
 	return min(10000000, (int)uliRtnValue & 0x7fffffff);
@@ -2234,7 +2265,7 @@ void CvMilitaryAI::UpdateBaseData()
 #endif // AUI_MILITARY_UNITS_WANTED_SQUARE_THREATS
 #else
 #ifdef AUI_MILITARY_UNITS_WANTED_SQUARE_THREATS
-	dMultiplier = 0.40 + (pow((double)m_pPlayer->GetMilitaryAI()->GetHighestThreat(), 2.0f) + iFlavorOffense + iFlavorDefense) / 100.0;
+	dMultiplier = 0.40 + (pow((double)m_pPlayer->GetMilitaryAI()->GetHighestThreat(), 2.0) + iFlavorOffense + iFlavorDefense) / 100.0;
 #else
 	dMultiplier = 0.40 + double(m_pPlayer->GetMilitaryAI()->GetHighestThreat() + iFlavorOffense + iFlavorDefense) / 100.0;
 #endif // AUI_MILITARY_UNITS_WANTED_SQUARE_THREATS
@@ -2253,7 +2284,9 @@ void CvMilitaryAI::UpdateBaseData()
 
 	// add in a few for the difficulty level (all above Chieftain are boosted)
 	int iDifficulty = max(0, GC.getGame().getHandicapInfo().GetID() - 1);
+#ifndef RAI_LESS_MILITARY_RESERVES_FOR_HIGHER_DIFFICULTY
 	m_iMandatoryReserveSize += iDifficulty;
+#endif
 
 	m_iMandatoryReserveSize = max(1, m_iMandatoryReserveSize);
 
@@ -3233,7 +3266,21 @@ void CvMilitaryAI::UpdateOperations()
 					}
 					else
 					{
+#ifdef RAI_USE_BASIC_CITY_ATTACK_FORCE_IN_CLASSICAL_ERA
+						MultiunitFormationTypes eFormation = MilitaryAIHelpers::CityAttackFormation(m_pPlayer);
+						iFilledSlots = MilitaryAIHelpers::NumberOfFillableSlots(m_pPlayer, eFormation, false, &iNumRequiredSlots, &iLandReservesUsed);
+						if(GC.getLogging() && GC.getAILogging())
+						{
+							CvString strTemp;
+							if (eFormation == MUFORMATION_BASIC_CITY_ATTACK_FORCE)
+								strTemp.Format("Trying to fill MUFORMATION_BASIC_CITY_ATTACK_FORCE");
+							else
+								strTemp.Format("Trying to fill MUFORMATION_BIGGER_CITY_ATTACK_FORCE");
+							LogMilitarySummaryMessage(strTemp);
+						}
+#else
 						iFilledSlots = MilitaryAIHelpers::NumberOfFillableSlots(m_pPlayer, (GC.getGame().getHandicapInfo().GetID() > 4 && !(GC.getMap().GetAIMapHint() & 1)) ? MUFORMATION_BIGGER_CITY_ATTACK_FORCE : MUFORMATION_BASIC_CITY_ATTACK_FORCE, false, &iNumRequiredSlots, &iLandReservesUsed);
+#endif
 						if((iNumRequiredSlots - iFilledSlots) > iNumUnitsWillingBuild || iLandReservesUsed > GetLandReservesAvailable())
 						{
 							continue;
@@ -3969,7 +4016,11 @@ UnitTypes CvMilitaryAI::GetUnitForArmy(CvCity* pCity) const
 	}
 	else
 	{
+#ifdef RAI_USE_BASIC_CITY_ATTACK_FORCE_IN_CLASSICAL_ERA
+		eFormation = MilitaryAIHelpers::CityAttackFormation(m_pPlayer);
+#else
 		eFormation = (GC.getGame().getHandicapInfo().GetID() > 4 && !(GC.getMap().GetAIMapHint() & 1)) ? MUFORMATION_BIGGER_CITY_ATTACK_FORCE : MUFORMATION_BASIC_CITY_ATTACK_FORCE;
+#endif
 	}
 	UnitAITypes eUnitAIType = MilitaryAIHelpers::FirstSlotCityCanFill(m_pPlayer, eFormation, (m_eArmyTypeBeingBuilt == ARMY_TYPE_NAVAL_INVASION), pCity->isCoastal(), false /*bSecondaryUnit*/);
 	UnitTypes eType = pCity->GetCityStrategyAI()->GetUnitProductionAI()->RecommendUnit(eUnitAIType);
@@ -5341,6 +5392,27 @@ int MilitaryAIHelpers::ComputeRecommendedNavySize(CvPlayer* pPlayer)
 #endif // AUI_GS_PRIORITY_RATIO
 #endif // AUI_MILITARY_FIX_COMPUTE_RECOMMENDED_NAVY_SIZE_GAME_TURN_SCALING
 	}
+#ifdef RAI_NAVY_FOCUS_IF_WARRING_ANOTHER_CONTINENT
+	// If currently at war with another continent, add more units
+	PlayerTypes eLoopPlayer;
+	bool bNavalWar = false;
+	for(int iPlayerLoop = 0; iPlayerLoop < MAX_MAJOR_CIVS; iPlayerLoop++)
+	{
+		eLoopPlayer = (PlayerTypes) iPlayerLoop;
+		if(eLoopPlayer != pPlayer->GetID() && pPlayer->GetDiplomacyAI()->IsPlayerValid(eLoopPlayer)
+			&& GET_TEAM(pPlayer->getTeam()).isAtWar(GET_PLAYER(eLoopPlayer).getTeam()))
+		{
+			if (pPlayer->getCapitalCity()->getArea() != GET_PLAYER(eLoopPlayer).getCapitalCity()->getArea())
+				bNavalWar = true;
+		}
+	}
+
+	if (bNavalWar)
+	{
+		dNumUnitsWanted *= (100 + RAI_NAVY_FOCUS_IF_WARRING_ANOTHER_CONTINENT);
+		dNumUnitsWanted /= 100;
+	}
+#endif //RAI_NAVY_FOCUS_IF_WARRING_ANOTHER_CONTINENT
 
 	return (int)floor(dNumUnitsWanted + 0.5);
 #else
@@ -5406,6 +5478,20 @@ int MilitaryAIHelpers::ComputeRecommendedNavySize(CvPlayer* pPlayer)
 	return iNumUnitsWanted;
 #endif // AUI_MILITARY_USE_DOUBLES
 }
+
+#ifdef RAI_USE_BASIC_CITY_ATTACK_FORCE_IN_CLASSICAL_ERA
+MultiunitFormationTypes MilitaryAIHelpers::CityAttackFormation(CvPlayer* pPlayer)
+{
+	MultiunitFormationTypes eFormation = MUFORMATION_BASIC_CITY_ATTACK_FORCE;
+
+	if (GC.getGame().getHandicapInfo().GetID() > 4 &&
+		!(GC.getMap().GetAIMapHint() & 1) && (int)pPlayer->GetCurrentEra() <= GC.getInfoTypeForString("ERA_CLASSICAL"))
+	{
+		eFormation = MUFORMATION_BIGGER_CITY_ATTACK_FORCE;
+	}
+	return eFormation;
+}
+#endif
 
 /// How many slots in this army can we fill right now with available units?
 int MilitaryAIHelpers::NumberOfFillableSlots(CvPlayer* pPlayer, MultiunitFormationTypes formation, bool bRequiresNavalMoves, int* piNumberSlotsRequired, int* piNumberLandReservesUsed)
