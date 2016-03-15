@@ -269,6 +269,9 @@ void CvDangerPlots::UpdateDanger(bool bPretendWarWithAllCivs, bool bIgnoreVisibi
 void CvDangerPlots::AddDanger(int iPlotX, int iPlotY, int iValue, bool bWithinOneMove)
 {
 	const int idx = iPlotX + iPlotY * GC.getMap().getGridWidth();
+#ifdef AUI_DANGER_PLOTS_FIX_ADD_DANGER_WITHIN_ONE_MOVE
+	iValue &= ~0x1;
+#else
 	if (iValue > 0)
 	{
 		if (bWithinOneMove)
@@ -280,8 +283,15 @@ void CvDangerPlots::AddDanger(int iPlotX, int iPlotY, int iValue, bool bWithinOn
 			iValue &= ~0x1;
 		}
 	}
+#endif
 
 	m_DangerPlots[idx] += iValue;
+#ifdef AUI_DANGER_PLOTS_FIX_ADD_DANGER_WITHIN_ONE_MOVE
+	if (bWithinOneMove)
+	{
+		m_DangerPlots[idx] |= 0x1;
+	}
+#endif
 }
 
 /// Return the danger value of a given plot
@@ -768,6 +778,9 @@ void CvDangerPlots::AssignUnitDangerValue(CvUnit* pUnit, CvPlot* pPlot)
 void CvDangerPlots::AssignCityDangerValue(CvCity* pCity, CvPlot* pPlot)
 {
 	int iCombatValue = pCity->getStrengthValue();
+#ifdef RAI_CITY_DANGER_FIX
+	iCombatValue *= 100;
+#endif
 	iCombatValue = ModifyDangerByRelationship(pCity->getOwner(), pPlot, iCombatValue);
 	AddDanger(pPlot->getX(), pPlot->getY(), iCombatValue, false);
 }
