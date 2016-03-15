@@ -316,6 +316,13 @@ bool CvUnitMovement::IsSlowedByZOC(const CvUnit* pUnit, const CvPlot* pFromPlot,
 					{
 						continue;
 					}
+#ifdef RAI_DEAD_UNITS_DONT_ZOC
+					// Is this unit dying??
+					if(pLoopUnit->isDelayedDeath())
+					{
+						continue;
+					}
+#endif
 
 					// At war with this unit's team?
 					if(unit_loop_team_type == BARBARIAN_TEAM || kUnitTeam.isAtWar(unit_loop_team_type))

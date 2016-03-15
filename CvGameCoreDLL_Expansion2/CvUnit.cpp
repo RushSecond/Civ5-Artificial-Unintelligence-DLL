@@ -1315,11 +1315,6 @@ void CvUnit::kill(bool bDelay, PlayerTypes ePlayer /*= NO_PLAYER*/)
 		LuaSupport::CallHook(pkScriptSystem, "UnitPrekill", args.get(), bResult);
 	}
 
-#ifdef RAI_DEAD_UNIT_UPDATES_MAP
-	if(pPlot)
-		pPlot->removeUnit(this, false);
-#endif
-
 	if(bDelay)
 	{
 		startDelayedDeath();
@@ -1420,10 +1415,8 @@ void CvUnit::kill(bool bDelay, PlayerTypes ePlayer /*= NO_PLAYER*/)
 	getCaptureDefinition(&kCaptureDef);
 
 	setXY(INVALID_PLOT_COORD, INVALID_PLOT_COORD, true);
-#ifndef RAI_DEAD_UNIT_UPDATES_MAP
 	if(pPlot)
 		pPlot->removeUnit(this, false);
-#endif
 
 	// Remove Resource Quantity from Used
 	for(int iResourceLoop = 0; iResourceLoop < GC.getNumResourceInfos(); iResourceLoop++)
@@ -18858,7 +18851,11 @@ void CvUnit::GetMovablePlotListOpt(FFastVector<CvPlot*>& plotData, CvPlot* pTarg
 							}
 							if (pNode)
 							{
+#ifdef RAI_SEIGE_UNITS_REPOSITION_FIX
+								if (pNode->m_iData2 == 1 && pNode->m_iData1 > getMustSetUpToRangedAttackCount() * 60)
+#else
 								if (pNode->m_iData2 == 1 && pNode->m_iData1 > getMustSetUpToRangedAttackCount())
+#endif
 								{
 									plotData.push_back(pLoopPlot);
 
@@ -18924,7 +18921,7 @@ void CvUnit::GetMovablePlotListOpt(FFastVector<CvPlot*>& plotData, CvPlot* pTarg
 #ifdef AUI_UNIT_DO_AITYPE_FLIP
 bool CvUnit::DoSingleUnitAITypeFlip(UnitAITypes eUnitAIType, bool bRevert, bool bForceOff)
 {
-	if (bRevert)
+	if (!bRevert)
 	{
 		if (AI_getUnitAIType() != eUnitAIType && getUnitInfo().GetUnitAIType(eUnitAIType))
 		{
