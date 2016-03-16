@@ -1186,7 +1186,11 @@ AITacticalPosture CvTacticalAI::SelectPosture(CvTacticalDominanceZone* pZone, AI
 		// Default for this zone
 		else
 		{
+#ifdef RAI_ONLY_ATTACK_CITY_WHEN_READY
+			eChosenPosture = AI_TACTICAL_POSTURE_WITHDRAW;
+#else
 			eChosenPosture = AI_TACTICAL_POSTURE_SURGICAL_CITY_STRIKE;
+#endif
 		}
 		break;
 	}
@@ -2642,12 +2646,24 @@ void CvTacticalAI::PlotMovesToSafety(bool bCombatUnits)
 #ifdef AUI_TACTICAL_TWEAKED_ACCEPTABLE_DANGER
 						iAcceptableDanger = pUnit->GetBaseCombatStrengthConsideringDamage() * (int)(AUI_TACTICAL_TWEAKED_ACCEPTABLE_DANGER + 0.5 + 
 							(100.0 - AUI_TACTICAL_TWEAKED_ACCEPTABLE_DANGER) * pow((double)pUnit->GetCurrHitPoints() / (double)pUnit->GetMaxHitPoints(), 2.0));
+#ifdef RAI_IMPROVED_FLEE_LOGIC
+						iAcceptableDanger *= 800;
+#endif
 #else
 						int iAcceptableDanger;
 						iAcceptableDanger = pUnit->GetBaseCombatStrengthConsideringDamage() * 100;
 #endif // AUI_TACTICAL_TWEAKED_ACCEPTABLE_DANGER
 						if(iDangerLevel > iAcceptableDanger)
 						{
+#ifdef RAI_LOGGING_FIXES
+							if (GC.getLogging() && GC.getAILogging())
+							{
+								CvString strMsg;
+								strMsg.Format("Danger levels for %s, X: %d, Y: %d, danger: %d, acceptable: %d", 
+									pUnit->getName().GetCString(), pUnit->getX(), pUnit->getY(), iDangerLevel, iAcceptableDanger);
+								LogTacticalMessage(strMsg);
+							}
+#endif
 							bAddUnit = true;
 						}
 					}
