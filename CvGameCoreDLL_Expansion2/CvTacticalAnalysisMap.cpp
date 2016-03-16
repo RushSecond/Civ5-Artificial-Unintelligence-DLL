@@ -781,7 +781,11 @@ void CvTacticalAnalysisMap::AddToDominanceZones(int iIndex, CvTacticalAnalysisCe
 	        pZone->GetTerritoryType() == TACTICAL_TERRITORY_TEMP_ZONE)
 	{
 		CvUnit* pFriendlyUnit = pCell->GetFriendlyMilitaryUnit();
+#ifdef RAI_DONT_COUNT_SCOUTS_WHEN_CALCULATING_DOMINANCE
+		if(pFriendlyUnit &&	!(pFriendlyUnit->AI_getUnitAIType() == UNITAI_EXPLORE || pFriendlyUnit->AI_getUnitAIType() == UNITAI_EXPLORE_SEA))
+#else
 		if(pFriendlyUnit)
+#endif
 		{
 			if(pFriendlyUnit->getDomainType() == DOMAIN_AIR ||
 			        (pFriendlyUnit->getDomainType() == DOMAIN_LAND && !pZone->IsWater()) ||
@@ -896,7 +900,12 @@ void CvTacticalAnalysisMap::CalculateMilitaryStrengths()
 				// Loop through all of OUR units first
 				for(pLoopUnit = m_pPlayer->firstUnit(&iLoop); pLoopUnit != NULL; pLoopUnit = m_pPlayer->nextUnit(&iLoop))
 				{
+#ifdef RAI_DONT_COUNT_SCOUTS_WHEN_CALCULATING_DOMINANCE
+					if(pLoopUnit->IsCombatUnit() &&
+						!(pLoopUnit->AI_getUnitAIType() == UNITAI_EXPLORE || pLoopUnit->AI_getUnitAIType() == UNITAI_EXPLORE_SEA))
+#else
 					if(pLoopUnit->IsCombatUnit())
+#endif
 					{
 						if(pLoopUnit->getDomainType() == DOMAIN_AIR ||
 						        (pLoopUnit->getDomainType() == DOMAIN_LAND && !pZone->IsWater()) ||
