@@ -12098,8 +12098,10 @@ void CvDiplomacyAI::DoContactMinorCivs()
 	int iLargeGiftFriendship;
 	int iMediumGiftFriendship;
 	int iSmallGiftFriendship;
+#ifndef RAI_RICH_AI_OUTBIDS_OTHERS_FOR_CITY_STATES
 	bool bMediumGiftAllies;
 	bool bSmallGiftAllies;
+#endif
 
 	PlayerTypes eID = GetPlayer()->GetID();
 
@@ -12432,6 +12434,29 @@ void CvDiplomacyAI::DoContactMinorCivs()
 						if(iFriendshipWithMinor <= iOtherPlayerFriendshipWithMinor)
 							continue;
 
+#ifdef RAI_RICH_AI_OUTBIDS_OTHERS_FOR_CITY_STATES
+						// We must have at least twice the gold per turn of this other major,
+						// otherwise it's a bad idea to get into a bidding war
+						if(m_pPlayer->calculateGoldRate() < GET_PLAYER(eOtherMajor).calculateGoldRate() * 2)
+							continue;
+
+						// If we can pass them with a small gift, great
+						if(iOtherPlayerFriendshipWithMinor - iFriendshipWithMinor < iSmallGiftFriendship)
+						{
+							iValue += /*15*/ GC.getMC_SMALL_GIFT_WEIGHT_PASS_OTHER_PLAYER();
+							sGiftInfo.bQuickBoost = true;
+							sGiftInfo.eMajorRival = eOtherMajor;
+						}
+						// If a medium gift passes them up, that's good too
+						else if(iOtherPlayerFriendshipWithMinor - iFriendshipWithMinor < iMediumGiftFriendship)
+						{
+							iValue += /*10*/ GC.getMC_GIFT_WEIGHT_PASS_OTHER_PLAYER();
+							sGiftInfo.eMajorRival = eOtherMajor;
+						}
+						// We're far behind, but this is still worth going after
+						else
+							sGiftInfo.eMajorRival = eOtherMajor;
+#else
 						// Only care if we'll actually be Allies or better
 						bMediumGiftAllies = iFriendshipWithMinor + iMediumGiftFriendship >= pMinorCivAI->GetAlliesThreshold();
 						bSmallGiftAllies = iFriendshipWithMinor + iSmallGiftFriendship >= pMinorCivAI->GetAlliesThreshold();
@@ -12452,6 +12477,7 @@ void CvDiplomacyAI::DoContactMinorCivs()
 						// We're behind and we can't catch up right now, so zero-out the value
 						else
 							iValue = 0;
+#endif
 					}
 
 					// Are we already allies?
