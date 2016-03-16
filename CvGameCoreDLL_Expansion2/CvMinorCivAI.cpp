@@ -4141,7 +4141,11 @@ int CvMinorCivAI::GetPersonalityQuestBias(MinorCivQuestTypes eQuest)
 	{
 		if(eTrait == MINOR_CIV_TRAIT_RELIGIOUS)
 		{
+#ifdef RAI_RELIGIOUS_TECH_CONTEST_FIX
+			iCount *= 50; //antonjs: todo: XML
+#else
 			iCount += 50; //antonjs: todo: XML
+#endif
 			iCount /= 100;
 		}
 	}
