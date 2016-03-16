@@ -7530,10 +7530,24 @@ int CvReligionAI::ScoreCityForMissionary(CvCity* pCity, UnitHandle pUnit)
 	{
 		iScore *= 5;
 	}
+#ifdef RAI_RELIGION_SCORE_CITY_PENALTY_IF_NO_OPEN_BORDERS
+	else
+	{
+		if(!kCityPlayer.GetReligions()->HasCreatedReligion())
+			iScore *= 3;
+		
+		// Greatly decreased score if we dont have open borders with city owner
+		if (!kCityPlayer.isMinorCiv() && !GET_TEAM(kCityPlayer.getTeam()).IsAllowsOpenBordersToTeam(m_pPlayer->getTeam()))
+		{
+			iScore /= RAI_RELIGION_SCORE_CITY_PENALTY_IF_NO_OPEN_BORDERS;
+		}
+	}
+#else
 	else if(!kCityPlayer.GetReligions()->HasCreatedReligion())
 	{
 		iScore *= 3;
 	}
+#endif
 
 #ifdef AUI_RELIGION_SCORE_CITY_FOR_MISSIONARY_USE_PATHFINDER_FOR_DISTANCE
 	int iDistance = TurnsToReachTarget(pUnit, pCity->plot(), AUI_RELIGION_SCORE_CITY_FOR_MISSIONARY_USE_PATHFINDER_FOR_DISTANCE, AUI_RELIGION_SCORE_CITY_FOR_MISSIONARY_USE_PATHFINDER_FOR_DISTANCE);
