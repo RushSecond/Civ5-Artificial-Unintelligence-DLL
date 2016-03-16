@@ -172,6 +172,23 @@ void CvCityConnections::UpdateCityPlotIDs(void)
 				iIndex++;
 			}
 		}
+#ifdef RAI_AI_BUILDS_ROAD_TOWARD_WAR_TARGET
+		else if(GET_TEAM(eMyPlayerTeam).isAtWar(ePlayerTeam))
+		{
+			// enemy's city
+			for(pLoopCity = GET_PLAYER(ePlayer).firstCity(&iLoop); pLoopCity != NULL; pLoopCity = GET_PLAYER(ePlayer).nextCity(&iLoop))
+			{
+				CvAssertMsg(pLoopCity->plot(), "pLoopCity does not have a plot. What??");
+
+				if (m_pPlayer->IsCityAlreadyTargeted(pLoopCity, DOMAIN_LAND))
+				{
+					int iPlotIndex = pLoopCity->plot()->GetPlotIndex();
+					m_aiCityPlotIDs.push_back(iPlotIndex);
+					iIndex++;
+				}			
+			}
+		}
+#endif
 		else if(ShouldConnectToOtherPlayer(ePlayer))
 		{
 			CvCity* pOtherCapital = GET_PLAYER(ePlayer).getCapitalCity();

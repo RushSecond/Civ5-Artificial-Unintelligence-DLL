@@ -272,10 +272,21 @@ int GetPlotYield(CvPlot* pPlot, YieldTypes eYield)
 void CvBuilderTaskingAI::ConnectCitiesToCapital(CvCity* pPlayerCapital, CvCity* pTargetCity, RouteTypes eRoute)
 {
 	bool bMajorMinorConnection = false;
+#ifdef RAI_AI_BUILDS_ROAD_TOWARD_WAR_TARGET
+	bool bWarConnection = false;
+	if(pTargetCity->getOwner() != pPlayerCapital->getOwner())
+	{
+		if (m_pPlayer->IsCityAlreadyTargeted(pTargetCity, DOMAIN_LAND))
+			bWarConnection = true;
+		else
+			bMajorMinorConnection = true;
+	}
+#else
 	if(pTargetCity->getOwner() != pPlayerCapital->getOwner())
 	{
 		bMajorMinorConnection = true;
 	}
+#endif
 
 	bool bIndustrialRoute = false;
 	if(GC.getGame().GetIndustrialRoute() == eRoute)
@@ -435,6 +446,12 @@ void CvBuilderTaskingAI::ConnectCitiesToCapital(CvCity* pPlayerCapital, CvCity* 
 	{
 		sValue = min(GC.getMINOR_CIV_ROUTE_QUEST_WEIGHT() / iPlotsNeeded, MAX_SHORT);
 	}
+#ifdef RAI_AI_BUILDS_ROAD_TOWARD_WAR_TARGET
+	else if(bWarConnection)
+	{
+		sValue = 500;
+	}
+#endif
 	else // normal route
 	{
 		// is this route worth building?
@@ -498,6 +515,17 @@ void CvBuilderTaskingAI::ConnectCitiesToCapital(CvCity* pPlayerCapital, CvCity* 
 				m_aiNonTerritoryPlots.push_back(GC.getMap().plotNum(pPlot->getX(), pPlot->getY()));
 			}
 		}
+#ifdef RAI_AI_BUILDS_ROAD_TOWARD_WAR_TARGET
+		// also add nodes that are in enemy territory to extra list
+		// should not build in another civs territory
+		if(bWarConnection)
+		{
+			if(pPlot->getOwner() != NULL && pPlot->getOwner() != m_pPlayer->GetID())
+			{
+				m_aiNonTerritoryPlots.push_back(GC.getMap().plotNum(pPlot->getX(), pPlot->getY()));
+			}
+		}
+#endif
 	}
 }
 
