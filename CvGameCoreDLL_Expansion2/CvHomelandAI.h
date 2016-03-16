@@ -298,6 +298,9 @@ private:
 	bool MoveToEmptySpaceNearTarget(CvUnit* pUnit, CvPlot* pTarget, bool bLand=true);
 	CvCity* ChooseBestFreeWonderCity(BuildingTypes eWonder, UnitHandle pEngineer);
 	CvPlot* FindArchaeologistTarget(CvUnit *pUnit);
+#ifdef RAI_ARCHAELOGIST_OUTSIDE_BORDERS_NEED_ARTIFACT_SLOTS
+	CvPlot* FindArchaeologistTarget(CvUnit *pUnit, int &iSlots);
+#endif
 	void UnitProcessed(int iID);
 	bool ExecuteWorkerMove(CvUnit* pUnit);
 	bool ExecuteCultureBlast(CvUnit* pUnit);

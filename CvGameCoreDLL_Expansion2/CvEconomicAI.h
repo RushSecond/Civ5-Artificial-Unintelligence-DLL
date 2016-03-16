@@ -224,6 +224,12 @@ public:
 	{
 		return m_iVisibleAntiquitySites;
 	};
+#ifdef RAI_ARCHAELOGIST_OUTSIDE_BORDERS_NEED_ARTIFACT_SLOTS
+	int GetUsableAntiquitySites() const
+	{
+		return m_iUsableAntiquitySites;
+	};
+#endif
 	void UpdatePlots();
 	bool m_bExplorationPlotsDirty;
 
@@ -259,6 +265,9 @@ private:
 	int m_iExplorersDisbanded;
 	int m_iLastTurnWorkerDisbanded;
 	int m_iVisibleAntiquitySites;
+#ifdef RAI_ARCHAELOGIST_OUTSIDE_BORDERS_NEED_ARTIFACT_SLOTS
+	int m_iUsableAntiquitySites;
+#endif
 
 	// Cached AI parameters
 	int m_iMinimumSettleFertility;

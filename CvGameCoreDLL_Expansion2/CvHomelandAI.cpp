@@ -5518,6 +5518,16 @@ void CvHomelandAI::ExecuteArchaeologistMoves()
 #ifdef AUI_HOMELAND_EXECUTE_ARCHAEOLOGIST_MOVES_DISBAND_IF_NO_AVAILABLE_SITES
 	int iSitesStillAvailable = m_TargetedAntiquitySites.size();
 #endif // AUI_HOMELAND_EXECUTE_ARCHAEOLOGIST_MOVES_DISBAND_IF_NO_AVAILABLE_SITES
+#ifdef RAI_ARCHAELOGIST_OUTSIDE_BORDERS_NEED_ARTIFACT_SLOTS
+	GreatWorkSlotType eArtArtifactSlot = CvTypes::getGREAT_WORK_SLOT_ART_ARTIFACT();
+	int iNumGreatWorkSlots = m_pPlayer->GetCulture()->GetNumAvailableGreatWorkSlots(eArtArtifactSlot);
+	if(GC.getLogging() && GC.getAILogging())
+	{
+		CvString strLogString;
+		strLogString.Format("Art slots: %d", iNumGreatWorkSlots);
+		LogHomelandMessage(strLogString);
+	}
+#endif
 	for(it = m_CurrentMoveUnits.begin(); it != m_CurrentMoveUnits.end(); ++it)
 	{
 		CvUnit* pUnit = m_pPlayer->getUnit(it->GetID());
@@ -5525,8 +5535,11 @@ void CvHomelandAI::ExecuteArchaeologistMoves()
 		{
 			continue;
 		}
-
+#ifdef RAI_ARCHAELOGIST_OUTSIDE_BORDERS_NEED_ARTIFACT_SLOTS
+		CvPlot* pTarget = FindArchaeologistTarget(pUnit, iNumGreatWorkSlots);
+#else
 		CvPlot* pTarget = FindArchaeologistTarget(pUnit);
+#endif
 		if (pTarget)
 		{
 			BuildTypes eBuild = (BuildTypes)GC.getInfoTypeForString("BUILD_ARCHAEOLOGY_DIG");
@@ -5570,7 +5583,11 @@ void CvHomelandAI::ExecuteArchaeologistMoves()
 		}
 #ifdef AUI_HOMELAND_EXECUTE_ARCHAEOLOGIST_MOVES_DISBAND_IF_NO_AVAILABLE_SITES
 		// Check is to make sure we've run out of archeological sites, otherwise it's simply a case of an unavailable site due to danger levels
-		else if (!m_pPlayer->isHuman() && iSitesStillAvailable <= 0)
+#ifdef RAI_ARCHAELOGIST_OUTSIDE_BORDERS_NEED_ARTIFACT_SLOTS
+		else if (!m_pPlayer->isHuman() && m_pPlayer->GetEconomicAI()->GetVisibleAntiquitySites() <= 0)
+#else
+		else if (!m_pPlayer->isHuman() && iSitesStillAvailable <= 0) 
+#endif
 		{
 			// Disband unit if no more sites available
 			pUnit->scrap();
@@ -6236,6 +6253,88 @@ CvPlot* CvHomelandAI::FindArchaeologistTarget(CvUnit *pUnit)
 
 	return pBestTarget;
 }
+
+#ifdef RAI_ARCHAELOGIST_OUTSIDE_BORDERS_NEED_ARTIFACT_SLOTS
+CvPlot* CvHomelandAI::FindArchaeologistTarget(CvUnit *pUnit, int &iSlots)
+{
+	CvPlot *pBestTarget = NULL;
+	int iBestTurns = MAX_INT;
+	bool bNeedSlot;
+	bool bBestNeedSlot = false;
+
+	// Reverse the logic from most of the Homeland moves; for this we'll loop through units and find the best targets for them (instead of vice versa)
+	std::vector<CvHomelandTarget>::iterator it;
+	for (it = m_TargetedAntiquitySites.begin(); it != m_TargetedAntiquitySites.end(); it++)
+	{
+		CvPlot* pTarget = GC.getMap().plot(it->GetTargetX(), it->GetTargetY());
+		if(GC.getLogging() && GC.getAILogging())
+		{
+			CvString strLogString;
+			strLogString.Format("Looking at site X: %d, Y: %d", pTarget->getX(), pTarget->getY());
+			LogHomelandMessage(strLogString);
+		}
+
+		// Check if we need an art slot for this. We don't if we can work this plot or a city state can
+		bNeedSlot = true;
+		CvCity* pWorkingCity = pTarget->getWorkingCity();
+		if(NULL != pWorkingCity)
+		{
+			CvPlayer& kPlayer = GET_PLAYER(pWorkingCity->getOwner());
+			if(kPlayer.isMinorCiv() || pWorkingCity->getOwner() == m_pPlayer->GetID())
+			{
+				if(GC.getLogging() && GC.getAILogging())
+				{
+					CvString strLogString;
+					strLogString.Format("Site doesnt need slot");
+					LogHomelandMessage(strLogString);
+				}
+				bNeedSlot = false;
+			}
+		}
+		// If we have no slots, then this site is not valid
+		if (bNeedSlot && iSlots <= 0)
+		{
+			if(GC.getLogging() && GC.getAILogging())
+			{
+				CvString strLogString;
+				strLogString.Format("Site invalid, %d slots", iSlots);
+				LogHomelandMessage(strLogString);
+			}
+			continue;
+		}
+		
+		if (m_pPlayer->GetPlotDanger(*pTarget) == 0)
+		{
+			int iTurns = TurnsToReachTarget(pUnit, pTarget);
+
+			if (iTurns < iBestTurns)
+			{
+				pBestTarget = pTarget;
+				iBestTurns = iTurns;
+				bBestNeedSlot = bNeedSlot;
+			}
+		}
+	}
+
+	// Erase this site from future contention
+	if (pBestTarget)
+	{
+		for (it = m_TargetedAntiquitySites.begin(); it != m_TargetedAntiquitySites.end(); it++)
+		{
+			if (it->GetTargetX() == pBestTarget->getX() && it->GetTargetY() == pBestTarget->getY())
+			{
+				m_TargetedAntiquitySites.erase(it);
+				break;
+			}
+		}
+
+		if(bBestNeedSlot)
+			iSlots--;
+	}
+
+	return pBestTarget;
+}
+#endif
 
 /// Find the plot where we want to pillage
 /// Log current status of the operation

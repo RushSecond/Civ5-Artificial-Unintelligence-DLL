@@ -1932,9 +1932,11 @@ void CvEconomicAI::DoPlotPurchases()
 	//  (LATER -- save up money to spend at newly settled cities)
 	if(iCurrentCost < iBalance && iGoldForHalfCost > iCurrentCost)
 	{
+#ifndef RAI_DONT_WASTE_GOLD_ON_BAD_TILES
 		// Lower our requirements if we're building up a sizable treasury
 		int iDiscountPercent = 50 * (iBalance - iCurrentCost) / (iGoldForHalfCost - iCurrentCost);
 		iBestScore = iBestScore - (iBestScore * iDiscountPercent / 100);
+#endif
 
 		// Find the best city to buy a plot
 		for(pLoopCity = m_pPlayer->firstCity(&iLoop); pLoopCity != NULL; pLoopCity = m_pPlayer->nextCity(&iLoop))
@@ -2131,12 +2133,23 @@ void CvEconomicAI::DoReconState()
 	int iNumExplorerDivisor = iNumExploringUnits + /*1*/ GC.getAI_STRATEGY_EARLY_EXPLORATION_EXPLORERS_WEIGHT_DIVISOR();
 	iStrategyWeight /= (iNumExplorerDivisor * iNumExplorerDivisor);
 	iStrategyWeight /= (int)sqrt((double)iNumLandPlotsRevealed);
-
+#ifdef RAI_DONT_CONVERT_MILITARY_TO_SCOUTS_IF_AT_WAR
+	if(iStrategyWeight > iWeightThreshold && m_pPlayer->GetMilitaryAI()->GetNumberCivsAtWarWith() <= 0)
+#else
 	if(iStrategyWeight > iWeightThreshold)
+#endif
 	{
 #ifdef AUI_ECONOMIC_FIX_DO_RECON_STATE_EXPLORE_ASSIGNMENT_FROM_CITY
 #ifdef AUI_MILITARY_AITYPE_FLIP
 		int iExplorersNeeded = int(iNumExplorerDivisor * (sqrt((double)iStrategyWeight / (double)iWeightThreshold) - 1) + 0.5);
+#ifdef RAI_LOGGING_FIXES
+		if (GC.getLogging() && GC.getAILogging())
+		{
+			CvString strLogString;
+			strLogString.Format("Need more explorers: %d", iExplorersNeeded);
+			m_pPlayer->GetHomelandAI()->LogHomelandMessage(strLogString);
+		}
+#endif
 		int iUnitsConverted = m_pPlayer->GetMilitaryAI()->DoUnitAITypeFlip(UNITAI_EXPLORE, false /*bRevert*/, iExplorersNeeded /*iMaxCount*/,
 			DEFENSE_STATE_CRITICAL /*eThresholdLandDefenseState*/, NO_DEFENSE_STATE /*eThresholdNavalDefenseState*/, THREAT_CRITICAL /*eThresholdThreatState*/);
 		if (iExplorersNeeded > iUnitsConverted)
@@ -2293,8 +2306,11 @@ void CvEconomicAI::DoReconState()
 		iNumExplorerDivisor = iNumExploringUnits + /*1*/ GC.getAI_STRATEGY_EARLY_EXPLORATION_EXPLORERS_WEIGHT_DIVISOR();
 		iStrategyWeight /= (iNumExplorerDivisor * iNumExplorerDivisor);
 		iStrategyWeight /= (int)sqrt((double)iNumCoastalTilesRevealed);
-
+#ifdef RAI_DONT_CONVERT_MILITARY_TO_SCOUTS_IF_AT_WAR
+		if (iStrategyWeight > iWeightThreshold && m_pPlayer->GetMilitaryAI()->GetNumberCivsAtWarWith() <= 0)
+#else
 		if(iStrategyWeight > iWeightThreshold/* || iNumExploringUnits == 0 && iNumCoastalTilesWithAdjacentFog > 50*/)
+#endif
 		{
 #ifdef AUI_ECONOMIC_FIX_DO_RECON_STATE_EXPLORE_ASSIGNMENT_FROM_CITY
 #ifdef AUI_MILITARY_AITYPE_FLIP
@@ -2398,6 +2414,55 @@ void CvEconomicAI::DoReconState()
 }
 
 /// Determine how many sites we have for archaeologists
+#ifdef RAI_ARCHAELOGIST_OUTSIDE_BORDERS_NEED_ARTIFACT_SLOTS
+void CvEconomicAI::DoAntiquitySites()
+{
+	GreatWorkSlotType eArtArtifactSlot = CvTypes::getGREAT_WORK_SLOT_ART_ARTIFACT();
+	int iNumGreatWorkSlots = m_pPlayer->GetCulture()->GetNumAvailableGreatWorkSlots(eArtArtifactSlot);
+
+	int iNumSites = 0;
+	int iUsableSites = 0;
+	int iPlotLoop;
+	CvPlot *pPlot;
+	ResourceTypes eArtifactResourceType = static_cast<ResourceTypes>(GC.getARTIFACT_RESOURCE());
+	ResourceTypes eHiddenArtifactResourceType = static_cast<ResourceTypes>(GC.getHIDDEN_ARTIFACT_RESOURCE());
+
+	for(iPlotLoop = 0; iPlotLoop < GC.getMap().numPlots(); iPlotLoop++)
+	{
+		pPlot = GC.getMap().plotByIndexUnchecked(iPlotLoop);
+		if(pPlot->isRevealed(m_pPlayer->getTeam()))
+		{
+			if (pPlot->getResourceType(m_pPlayer->getTeam()) == eArtifactResourceType ||
+				pPlot->getResourceType(m_pPlayer->getTeam()) == eHiddenArtifactResourceType)
+			{
+				iNumSites++;
+
+				// Always usable if we can work this site (or a city state can)
+				CvCity* pWorkingCity = pPlot->getWorkingCity();
+				if(NULL != pWorkingCity)
+				{
+					CvPlayer& kPlayer = GET_PLAYER(pWorkingCity->getOwner());
+					if(kPlayer.isMinorCiv() || pWorkingCity->getOwner() == m_pPlayer->GetID())
+					{
+						iUsableSites++;
+						continue;
+					}
+				}
+				// Othewise its usable if we have the slot for it and didn't promise not to dig there
+				if (!(pPlot->getOwner() != NO_PLAYER && m_pPlayer->GetDiplomacyAI()->IsPlayerMadeNoDiggingPromise(pPlot->getOwner()))
+					&& iNumGreatWorkSlots > 0)
+				{
+					iUsableSites++;
+					iNumGreatWorkSlots--;
+				}				
+			}
+		}
+	}
+
+	m_iVisibleAntiquitySites = iNumSites;
+	m_iUsableAntiquitySites = iUsableSites;
+}
+#else
 void CvEconomicAI::DoAntiquitySites()
 {
 	int iNumSites = 0;
@@ -2421,6 +2486,7 @@ void CvEconomicAI::DoAntiquitySites()
 
 	m_iVisibleAntiquitySites = iNumSites;
 }
+#endif
 
 void CvEconomicAI::DisbandExtraWorkers()
 {
@@ -4503,7 +4569,11 @@ bool EconomicAIHelpers::IsTestStrategy_GS_SpaceshipHomestretch(CvPlayer* pPlayer
 /// We see a lot of sites needing archaeologists
 bool EconomicAIHelpers::IsTestStrategy_NeedArchaeologists(CvPlayer* pPlayer)
 {
+#ifdef RAI_ARCHAELOGIST_OUTSIDE_BORDERS_NEED_ARTIFACT_SLOTS
+	int iNumSites = pPlayer->GetEconomicAI()->GetUsableAntiquitySites();
+#else
 	int iNumSites = pPlayer->GetEconomicAI()->GetVisibleAntiquitySites();
+#endif
 	int iNumArchaeologists = pPlayer->GetNumUnitsWithUnitAI(UNITAI_ARCHAEOLOGIST, true);
 
 	if (iNumSites > iNumArchaeologists)
