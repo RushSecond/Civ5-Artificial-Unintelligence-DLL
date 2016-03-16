@@ -1353,7 +1353,12 @@ GreatPeopleDirectiveTypes CvPlayerAI::GetDirectiveArtist(CvUnit* pGreatArtist)
 	}
 
 	// If Persia and I'm at war, get a Golden Age going
+#ifdef RAI_GREAT_ARTISTS_CAN_EXTEND_GOLDEN_AGES
+	if (eDirective == NO_GREAT_PEOPLE_DIRECTIVE_TYPE && GetPlayerTraits()->GetGoldenAgeMoveChange() > 0
+		&& GetMilitaryAI()->GetNumberCivsAtWarWith() > 1)
+#else
 	if (eDirective == NO_GREAT_PEOPLE_DIRECTIVE_TYPE && GetPlayerTraits()->GetGoldenAgeMoveChange() > 0 && GetMilitaryAI()->GetNumberCivsAtWarWith() > 1 && !isGoldenAge())
+#endif
 	{
 		eDirective = GREAT_PEOPLE_DIRECTIVE_GOLDEN_AGE;
 	}
@@ -1365,13 +1370,31 @@ GreatPeopleDirectiveTypes CvPlayerAI::GetDirectiveArtist(CvUnit* pGreatArtist)
 	}
 
 	// Create Great Work if there is a slot
+#ifdef RAI_GREAT_ARTISTS_SAVE_SLOTS_FOR_ARCHAEOLOGISTS
+	GreatWorkType eGreatWork = pGreatArtist->GetGreatWork();
+	int iNumArchaeologists = GetNumUnitsWithUnitAI(UNITAI_ARCHAEOLOGIST, true);
+	int iNumSites = GetEconomicAI()->GetVisibleAntiquitySites();
+	GreatWorkSlotType eArtArtifactSlot = CvTypes::getGREAT_WORK_SLOT_ART_ARTIFACT();
+	int iNumGreatWorkSlots = GetCulture()->GetNumAvailableGreatWorkSlots(eArtArtifactSlot);
+	int iLimitingFactor = FASTMIN(iNumArchaeologists, iNumSites);
+
+	if (eDirective == NO_GREAT_PEOPLE_DIRECTIVE_TYPE && iNumGreatWorkSlots > iLimitingFactor
+		&& GetEconomicAI()->GetBestGreatWorkCity(pGreatArtist->plot(), eGreatWork))
+	{
+		eDirective = GREAT_PEOPLE_DIRECTIVE_USE_POWER;
+	}
+#else
 	GreatWorkType eGreatWork = pGreatArtist->GetGreatWork();
 	if (eDirective == NO_GREAT_PEOPLE_DIRECTIVE_TYPE && GetEconomicAI()->GetBestGreatWorkCity(pGreatArtist->plot(), eGreatWork))
 	{
 		eDirective = GREAT_PEOPLE_DIRECTIVE_USE_POWER;
 	}
-
+#endif
+#ifdef RAI_GREAT_ARTISTS_CAN_EXTEND_GOLDEN_AGES
+	if (eDirective == NO_GREAT_PEOPLE_DIRECTIVE_TYPE)
+#else
 	if (eDirective == NO_GREAT_PEOPLE_DIRECTIVE_TYPE && !isGoldenAge())
+#endif
 	{
 		eDirective = GREAT_PEOPLE_DIRECTIVE_GOLDEN_AGE;
 	}
