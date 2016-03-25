@@ -262,6 +262,9 @@ protected:
 	static int lGetAttackModifier(lua_State* L);
 	static int lGetDefenseModifier(lua_State* L);
 	static int lGetRangedAttackModifier(lua_State* L);
+#ifdef RBM_LUA_RANGED_DEFENSE
+	LUAAPIEXTN(GetRangedDefenseModifier);
+#endif
 	static int lCityAttackModifier(lua_State* L);
 	static int lCityDefenseModifier(lua_State* L);
 	static int lHillsAttackModifier(lua_State* L);
