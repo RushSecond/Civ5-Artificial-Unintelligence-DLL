@@ -3427,7 +3427,43 @@ MajorCivApproachTypes CvDiplomacyAI::GetBestApproachTowardsMajorCiv(PlayerTypes 
 	////////////////////////////////////
 	// DISTANCE - the farther away a player is the less likely we are to want to attack them!
 	////////////////////////////////////
+#ifdef RAI_DISTANT_WAR_MORE_LIKELY_IN_LATER_ERAS
+	if (GetPlayer()->GetCurrentEra() < GC.getInfoTypeForString("ERA_FUTURE"))
+	{
+		int iProxWarMod = 100;
+		switch(GetPlayer()->GetProximityToPlayer(ePlayer))
+		{
+		case PLAYER_PROXIMITY_NEIGHBORS:
+			iProxWarMod = /*115*/ GC.getAPPROACH_WAR_PROXIMITY_NEIGHBORS();
+			break;
+		case PLAYER_PROXIMITY_CLOSE:
+			iProxWarMod = /*100*/ GC.getAPPROACH_WAR_PROXIMITY_CLOSE();
+			break;
+		case PLAYER_PROXIMITY_FAR:
+			iProxWarMod = /*60*/ GC.getAPPROACH_WAR_PROXIMITY_FAR();
+			break;
+		case PLAYER_PROXIMITY_DISTANT:
+			iProxWarMod = /*50*/ GC.getAPPROACH_WAR_PROXIMITY_DISTANT();
+			break;
+		}
+		// Flattening effects for modern and atomic eras
+		if (GetPlayer()->GetCurrentEra() >= GC.getInfoTypeForString("ERA_MODERN"))
+		{
+			iProxWarMod += 100;
+			iProxWarMod /= 2;
+		}
+		if (GetPlayer()->GetCurrentEra() >= GC.getInfoTypeForString("ERA_POSTMODERN"))
+		{
+			iProxWarMod += 100;
+			iProxWarMod /= 2;
+		}
 
+		viApproachWeights[MAJOR_CIV_APPROACH_WAR] *= iProxWarMod;
+		viApproachWeights[MAJOR_CIV_APPROACH_WAR] /= 100;
+		viApproachWeights[MAJOR_CIV_APPROACH_DECEPTIVE] *= iProxWarMod;
+		viApproachWeights[MAJOR_CIV_APPROACH_DECEPTIVE] /= 100;
+	}
+#else
 	// Factor in distance
 	switch(GetPlayer()->GetProximityToPlayer(ePlayer))
 	{
@@ -3456,6 +3492,7 @@ MajorCivApproachTypes CvDiplomacyAI::GetBestApproachTowardsMajorCiv(PlayerTypes 
 		viApproachWeights[MAJOR_CIV_APPROACH_DECEPTIVE] /= 100;
 		break;
 	}
+#endif
 
 	////////////////////////////////////
 	// PEACE TREATY - have we made peace with this player before?  If so, reduce war weight
@@ -6126,6 +6163,53 @@ void CvDiplomacyAI::DoUpdateWarProjections()
 //			if (IsAtWar(eLoopPlayer))
 			{
 				iWarScore = GetWarScore(eLoopPlayer);
+
+#ifdef RAI_WAR_CONSIDERS_DEFENSIVE_PACT
+				if (!IsAtWar(eLoopPlayer))
+				{
+					PlayerTypes ePactPlayer;
+					TeamTypes eLoopTeam = GET_PLAYER(eLoopPlayer).getTeam();
+					int iPactWarScore;
+					PlayerProximityTypes ePactProximity;
+					for (uint ui = 0; ui < MAX_PLAYERS; ui++)
+					{
+						ePactPlayer = PlayerTypes(ui);
+						if(!IsPlayerValid(ePactPlayer))
+							continue;
+
+						TeamTypes eDefPactTeam = GET_PLAYER(ePactPlayer).getTeam();
+						if (eDefPactTeam != eLoopTeam && eDefPactTeam != GetPlayer()->getTeam() && GET_TEAM(eDefPactTeam).isAlive() &&
+							!GET_TEAM(eDefPactTeam).isAtWar(GetPlayer()->getTeam()))
+						{
+							if (GET_TEAM(eLoopTeam).IsHasDefensivePact(eDefPactTeam))
+							{
+								// How would a war with this pact guy go
+								iPactWarScore = GetWarScore(ePactPlayer) - /*25*/ GC.getWAR_PROJECTION_THRESHOLD_GOOD();
+
+								if(iPactWarScore >= 0)
+									continue;
+
+								ePactProximity = FASTMAX(GetPlayer()->GetProximityToPlayer(ePactPlayer), GET_PLAYER(eLoopPlayer).GetProximityToPlayer(ePactPlayer));
+
+								// If pact guy is far from both of us, he doesn't matter so much					
+								switch(ePactProximity)
+								{
+								case PLAYER_PROXIMITY_FAR:
+									iPactWarScore *= 60;
+									break;
+								case PLAYER_PROXIMITY_DISTANT:
+									iPactWarScore *= 30;
+									break;
+								default:
+									iPactWarScore *= 100;
+								}
+
+								iWarScore += iPactWarScore / 100;
+							}
+						}
+					}
+				}
+#endif
 
 				// Do the final math
 				if(iWarScore >= /*100*/ GC.getWAR_PROJECTION_THRESHOLD_VERY_GOOD())
