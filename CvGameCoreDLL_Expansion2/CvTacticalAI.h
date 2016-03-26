@@ -313,6 +313,9 @@ public:
 	};
 	void Clear()
 	{
+#ifdef RAI_TACTICAL_AI_ZONE_TARGET_OPTIMIZATIONS
+		m_bChecked = false;
+#endif
 		m_eTargetType = AI_TACTICAL_TARGET_NONE;
 		m_iTargetX = -1;
 		m_iTargetY = -1;
@@ -321,6 +324,16 @@ public:
 		m_pAuxData = NULL;
 		m_iAuxData = 0;
 	};
+#ifdef RAI_TACTICAL_AI_ZONE_TARGET_OPTIMIZATIONS
+	inline void SetChecked(bool checked)
+	{
+		m_bChecked = checked;
+	}
+	inline bool GetChecked()
+	{
+		return m_bChecked;
+	}
+#endif
 	inline bool operator<(const CvTacticalTarget& target) const
 	{
 		return (m_iAuxData > target.m_iAuxData);
@@ -393,6 +406,9 @@ public:
 	}
 
 private:
+#ifdef RAI_TACTICAL_AI_ZONE_TARGET_OPTIMIZATIONS
+	bool m_bChecked;
+#endif
 	AITacticalTargetType m_eTargetType;
 	int m_iTargetX;
 	int m_iTargetY;
@@ -761,6 +777,9 @@ enum TacticalAIInfoTypes
 };
 
 typedef FStaticVector<CvTacticalTarget, 256, false, c_eCiv5GameplayDLL > TacticalList;
+#ifdef RAI_TACTICAL_AI_ZONE_TARGET_OPTIMIZATIONS
+typedef FStaticVector<CvTacticalTarget*, 256, false, c_eCiv5GameplayDLL > TacticalPointerList;
+#endif
 
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 //  CLASS:      CvTacticalAI
@@ -885,9 +904,15 @@ private:
 	void EliminateNearbyBlockadePoints();
 	void ExtractTargetsForZone(CvTacticalDominanceZone* pZone /* Pass in NULL for all zones */);
 	CvTacticalTarget* GetFirstZoneTarget(AITacticalTargetType eType);
+#ifdef RAI_TACTICAL_AI_ZONE_TARGET_OPTIMIZATIONS
+	CvTacticalTarget* GetNextZoneTarget(bool checkCurrent = false);
+	CvTacticalTarget* GetFirstUnitTarget();
+	CvTacticalTarget* GetNextUnitTarget(bool checkCurrent = false);
+#else
 	CvTacticalTarget* GetNextZoneTarget();
 	CvTacticalTarget* GetFirstUnitTarget();
 	CvTacticalTarget* GetNextUnitTarget();
+#endif
 
 	// Routines to execute a mission
 	void ExecuteBarbarianCampMove(CvPlot* pTargetPlot);
@@ -1040,7 +1065,11 @@ private:
 
 	// Lists of targets for the turn
 	TacticalList m_AllTargets;
+#ifdef RAI_TACTICAL_AI_ZONE_TARGET_OPTIMIZATIONS
+	TacticalPointerList m_ZoneTargets;
+#else
 	TacticalList m_ZoneTargets;
+#endif
 	TacticalList m_NavalResourceBlockadePoints;
 	FStaticVector<CvTacticalTarget, NUM_CITY_PLOTS, true, c_eCiv5GameplayDLL, 0> m_TempTargets;
 

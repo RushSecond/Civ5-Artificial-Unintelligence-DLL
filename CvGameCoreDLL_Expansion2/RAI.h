@@ -31,7 +31,15 @@
 // Note to DelnarErsike: pNode->m_iData1 returns movement allowance remaining, TIMES 60.
 #define RAI_SEIGE_UNITS_REPOSITION_FIX
 
+// The AuI move and shoot functions generally will call the pathfinder less
 #define RAI_SHOOT_AND_MOVE_PERFORMANCE
+
+// Targets in Tactical AI can now be "checked off the list" if it's determined that no unit can reach or see the target
+// This prevents unneccessarily checking faraway targets multiple times
+// #define RAI_TACTICAL_AI_ZONE_TARGET_OPTIMIZATIONS
+
+// Prevents the AI from throwing ranged units into extremely dangerous areas in its attempt to defend a city or "safely bombard"
+#define RAI_NO_RANGED_STUPIDITY
 
 // Default posture for enemy city zones is no longer surgical strike, instead it's withdraw.
 // This makes AI not attack city unitl they are READY.

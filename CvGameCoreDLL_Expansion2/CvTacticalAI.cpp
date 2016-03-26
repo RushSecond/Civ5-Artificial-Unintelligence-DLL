@@ -1658,7 +1658,6 @@ void CvTacticalAI::FindTacticalTargets()
 						newTarget.SetTargetType(AI_TACTICAL_TARGET_LOW_PRIORITY_CIVILIAN);
 						newTarget.SetTargetPlayer(pTargetUnit->getOwner());
 						newTarget.SetAuxData((void*)pTargetUnit);
-
 #ifdef RAI_DESTROY_ENEMY_EMBARKED_UNITS
 						if(pTargetUnit->isEmbarked() && !pTargetUnit->IsCombatUnit())
 						{
@@ -2317,6 +2316,13 @@ bool CvTacticalAI::PlotCaptureCityMoves()
 						}
 					}
 				}
+#ifdef RAI_TACTICAL_AI_ZONE_TARGET_OPTIMIZATIONS
+				else // No units of our could reach, so remove this target
+				{
+					pTarget = GetNextZoneTarget(true);
+					continue;
+				}
+#endif
 			}
 		}
 		pTarget = GetNextZoneTarget();
@@ -2426,6 +2432,13 @@ bool CvTacticalAI::PlotDamageCityMoves()
 						bAttackMade = true;
 					}
 				}
+#ifdef RAI_TACTICAL_AI_ZONE_TARGET_OPTIMIZATIONS
+				else // If nothing can hit it, check it off the list
+				{
+					pTarget = GetNextZoneTarget(true);
+					continue;
+				}
+#endif
 			}
 		}
 		pTarget = GetNextZoneTarget();
@@ -2591,6 +2604,13 @@ void CvTacticalAI::PlotDestroyUnitMoves(AITacticalTargetType targetType, bool bM
 					}
 				}
 			}
+#ifdef RAI_TACTICAL_AI_ZONE_TARGET_OPTIMIZATIONS
+			else // If nothing can hit this unit, then check it off the list so we don't look at it again
+			{
+				pTarget = GetNextZoneTarget(true);
+				continue;
+			}
+#endif
 		}
 		pTarget = GetNextZoneTarget();
 	}
@@ -2996,6 +3016,13 @@ void CvTacticalAI::PlotPillageMoves(AITacticalTargetType eTarget, bool bFirstPas
 				LogTacticalMessage(strLogString);
 			}
 		}
+#ifdef RAI_TACTICAL_AI_ZONE_TARGET_OPTIMIZATIONS
+		else // Still no? Then remove it to make sure we don't look at it again
+		{
+			pTarget = GetNextZoneTarget(true);
+			continue;
+		}
+#endif
 
 		pTarget = GetNextZoneTarget();
 	}
@@ -3172,8 +3199,15 @@ void CvTacticalAI::PlotBlockadeImprovementMoves()
 				strLogString.Format("Blockading naval resource(s) with move to, X: %d, Y: %d", pTarget->GetTargetX(), pTarget->GetTargetY());
 				LogTacticalMessage(strLogString);
 			}
+#ifdef RAI_TACTICAL_AI_ZONE_TARGET_OPTIMIZATIONS
+			pTarget = GetNextZoneTarget();
+		}
+		else
+			pTarget = GetNextZoneTarget(true);
+#else
 		}
 		pTarget = GetNextZoneTarget();
+#endif
 	}
 }
 
@@ -3215,8 +3249,15 @@ void CvTacticalAI::PlotCivilianAttackMoves(AITacticalTargetType eTargetType)
 				}
 				LogTacticalMessage(strLogString);
 			}
+#ifdef RAI_TACTICAL_AI_ZONE_TARGET_OPTIMIZATIONS
+			pTarget = GetNextZoneTarget();
+		}
+		else
+			pTarget = GetNextZoneTarget(true);
+#else
 		}
 		pTarget = GetNextZoneTarget();
+#endif
 	}
 }
 
@@ -6526,7 +6567,106 @@ void CvTacticalAI::ExtractTargetsForZone(CvTacticalDominanceZone* pZone /* Pass 
 		}
 	}
 }
+#ifdef RAI_TACTICAL_AI_ZONE_TARGET_OPTIMIZATIONS
+/// Find the first target of a requested type in current dominance zone (call after ExtractTargetsForZone())
+CvTacticalTarget* CvTacticalAI::GetFirstZoneTarget(AITacticalTargetType eType)
+{
+	m_eCurrentTargetType = eType;
+	m_iCurrentTargetIndex = 0;
 
+	while(m_iCurrentTargetIndex < (int)m_ZoneTargets.size())
+	{
+		if(!m_ZoneTargets[m_iCurrentTargetIndex].GetChecked() &&
+			(m_eCurrentTargetType == AI_TACTICAL_TARGET_NONE || m_ZoneTargets[m_iCurrentTargetIndex].GetTargetType() == m_eCurrentTargetType))
+		{
+			return &m_ZoneTargets[m_iCurrentTargetIndex];
+		}
+		m_iCurrentTargetIndex++;
+	}
+
+	return NULL;
+}
+
+/// Find the next target of a requested type in current dominance zone (call after GetFirstZoneTarget())
+CvTacticalTarget* CvTacticalAI::GetNextZoneTarget(bool checkCurrent)
+{
+	if (checkCurrent)
+	{
+		m_ZoneTargets[m_iCurrentTargetIndex].SetChecked(true);
+		if (GC.getLogging() && GC.getAILogging())
+		{
+			CvPlot* pPlot = GC.getMap().plot(m_ZoneTargets[m_iCurrentTargetIndex].GetTargetX(),m_ZoneTargets[m_iCurrentTargetIndex].GetTargetY());
+			CvString strMsg;
+			strMsg.Format("Checking target off the list, X: %d, Y: %d", pPlot->getX(), pPlot->getY());
+			LogTacticalMessage(strMsg);
+		}	
+	}
+	m_iCurrentTargetIndex++;
+
+	while(m_iCurrentTargetIndex < (int)m_ZoneTargets.size())
+	{
+		if(!m_ZoneTargets[m_iCurrentTargetIndex].GetChecked() &&
+			(m_eCurrentTargetType == AI_TACTICAL_TARGET_NONE || m_ZoneTargets[m_iCurrentTargetIndex].GetTargetType() == m_eCurrentTargetType))
+		{
+			return &m_ZoneTargets[m_iCurrentTargetIndex];
+		}
+		m_iCurrentTargetIndex++;
+	}
+
+	return NULL;
+}
+
+/// Find the first unit target (in full list of targets -- NOT by zone)
+CvTacticalTarget* CvTacticalAI::GetFirstUnitTarget()
+{
+	m_iCurrentUnitTargetIndex = 0;
+
+	while(m_iCurrentUnitTargetIndex < (int)m_AllTargets.size())
+	{
+		if(!m_AllTargets[m_iCurrentUnitTargetIndex].GetChecked() &&
+			(m_AllTargets[m_iCurrentUnitTargetIndex].GetTargetType() == AI_TACTICAL_TARGET_HIGH_PRIORITY_UNIT ||
+		        m_AllTargets[m_iCurrentUnitTargetIndex].GetTargetType() == AI_TACTICAL_TARGET_MEDIUM_PRIORITY_UNIT ||
+		        m_AllTargets[m_iCurrentUnitTargetIndex].GetTargetType() == AI_TACTICAL_TARGET_LOW_PRIORITY_UNIT))
+		{
+			return &m_AllTargets[m_iCurrentUnitTargetIndex];
+		}
+		m_iCurrentUnitTargetIndex++;
+	}
+
+	return NULL;
+}
+
+/// Find the next unit target (call after GetFirstUnitTarget())
+CvTacticalTarget* CvTacticalAI::GetNextUnitTarget(bool checkCurrent)
+{
+	if (checkCurrent)
+	{
+		m_AllTargets[m_iCurrentUnitTargetIndex].SetChecked(true);
+		if (GC.getLogging() && GC.getAILogging())
+		{
+			CvPlot* pPlot = GC.getMap().plot(m_AllTargets[m_iCurrentUnitTargetIndex].GetTargetX(),m_AllTargets[m_iCurrentUnitTargetIndex].GetTargetY());
+			CvString strMsg;
+			strMsg.Format("Checking target off the list, X: %d, Y: %d", pPlot->getX(), pPlot->getY());
+			LogTacticalMessage(strMsg);
+		}	
+	}
+	m_iCurrentUnitTargetIndex++;
+
+	while(m_iCurrentUnitTargetIndex < (int)m_AllTargets.size())
+	{
+		if(!m_AllTargets[m_iCurrentUnitTargetIndex].GetChecked() &&
+			(m_AllTargets[m_iCurrentUnitTargetIndex].GetTargetType() == AI_TACTICAL_TARGET_HIGH_PRIORITY_UNIT ||
+		        m_AllTargets[m_iCurrentUnitTargetIndex].GetTargetType() == AI_TACTICAL_TARGET_MEDIUM_PRIORITY_UNIT ||
+		        m_AllTargets[m_iCurrentUnitTargetIndex].GetTargetType() == AI_TACTICAL_TARGET_LOW_PRIORITY_UNIT))
+		{
+			return &m_AllTargets[m_iCurrentUnitTargetIndex];
+		}
+		m_iCurrentUnitTargetIndex++;
+	}
+
+	return NULL;
+}
+#else
 /// Find the first target of a requested type in current dominance zone (call after ExtractTargetsForZone())
 CvTacticalTarget* CvTacticalAI::GetFirstZoneTarget(AITacticalTargetType eType)
 {
@@ -6599,6 +6739,7 @@ CvTacticalTarget* CvTacticalAI::GetNextUnitTarget()
 
 	return NULL;
 }
+#endif // RAI_TACTICAL_AI_ZONE_TARGET_OPTIMIZATIONS
 
 // ROUTINES TO EXECUTE A MISSION
 
@@ -9583,8 +9724,43 @@ bool CvTacticalAI::ExecuteSafeBombards(CvTacticalTarget& kTarget)
 						{
 							if(pCell->IsWithinRangeOfTarget() && !pCell->IsSubjectToAttack())
 							{
+#ifdef RAI_NO_RANGED_STUPIDITY
+								if (iTurnsToReach > 0)
+								{
+									// Check adjacent plots to see if there's danger. If there is, this plot actually isn't safe for moving there over multiple turns
+									bool bMultipleTurnDanger = false;
+									CvPlot* pAdjacentPlot;
+									for (int jJ = 0; jJ < NUM_DIRECTION_TYPES; jJ++)
+									{
+										pAdjacentPlot = plotDirection(pLoopPlot->getX(), pLoopPlot->getY(), ((DirectionTypes)jJ));
+										if (pAdjacentPlot != NULL)
+										{
+											iPlotIndex = GC.getMap().plotNum(pAdjacentPlot->getX(), pAdjacentPlot->getY());
+											pCell = m_pMap->GetCell(iPlotIndex);
+											if (pCell && pCell->IsSubjectToAttack())
+											{
+												bMultipleTurnDanger = true;
+												break;
+											}
+										}
+									}
+									if (bMultipleTurnDanger)
+									{
+										continue;
+									}
+								}
+#endif
 								bool bHaveLOS = pLoopPlot->canSeePlot(pTargetPlot, m_pPlayer->getTeam(), iRange, NO_DIRECTION);
+#ifdef RAI_NO_RANGED_STUPIDITY
+								// Don't ignore units if we must get there in a single turn!
+								if(iTurnsToReach == 0 ?
+									FindClosestUnit(pLoopPlot, iTurnsToReach, false/*bMustHaveHalfHP*/, true/*bMustBeRangedUnit*/,
+									iDistance, !bHaveLOS, false/*bMustBeMeleeUnit*/, false/*bIgnoreUnits*/, pTargetPlot)
+									: FindClosestUnit(pLoopPlot, iTurnsToReach, false/*bMustHaveHalfHP*/, true/*bMustBeRangedUnit*/,
+									iDistance, !bHaveLOS, false/*bMustBeMeleeUnit*/, true/*bIgnoreUnits*/, pTargetPlot))
+#else
 								if(FindClosestUnit(pLoopPlot, iTurnsToReach, false/*bMustHaveHalfHP*/, true/*bMustBeRangedUnit*/, iDistance, !bHaveLOS, false/*bMustBeMeleeUnit*/, true/*bIgnoreUnits*/, pTargetPlot))
+#endif	
 								{
 									UnitHandle pUnit = m_pPlayer->getUnit(m_CurrentMoveUnits[0].GetID());
 									if(pUnit)
@@ -10476,7 +10652,11 @@ void CvTacticalAI::ExecuteHedgehogDefense(CvTacticalTarget& kTarget, CvTacticalD
 			if (eTargetType != AI_TACTICAL_TARGET_HIGH_PRIORITY_UNIT)
 			{
 				CvPlot* pLoopPlot = GC.getMap().plot(m_TempTargets[iI].GetTargetX(), m_TempTargets[iI].GetTargetY());
+#ifdef RAI_NO_RANGED_STUPIDITY
+				if(FindClosestOperationUnit(pLoopPlot, false /*bSafeForRanged*/, false /*bMustBeRangedUnit*/))
+#else
 				if(FindClosestOperationUnit(pLoopPlot, true /*bSafeForRanged*/, false /*bMustBeRangedUnit*/))
+#endif
 				{
 					for(unsigned int jJ = 0; jJ < m_CurrentMoveUnits.size(); jJ++)
 					{
@@ -11018,14 +11198,6 @@ bool CvTacticalAI::FindUnitsWithinStrikingDistance(CvPlot* pTarget, int iNumTurn
 				else if(!bNoRangedUnits && !bWillPillage && pLoopUnit->IsCanAttackRanged())
 #endif // AUI_TACTICAL_FIND_UNITS_WITHIN_STRIKING_DISTANCE_NO_RANGED_SHORTCUT
 				{
-#ifdef RAI_LOGGING_FIXES
-					if (GC.getLogging() && GC.getAILogging())
-					{
-						CvString strLogString;
-						strLogString.Format("I'm ranged: %s", GC.getUnitInfo(pLoopUnit->getUnitType())->GetDescription());
-						LogTacticalMessage(strLogString);
-					}
-#endif
 					// Don't use air units for air strikes if at or below half health
 					if (pLoopUnit->getDomainType() != DOMAIN_AIR || (pLoopUnit->getDamage() * 2) < GC.getMAX_HIT_POINTS())
 					{
@@ -11536,6 +11708,11 @@ bool CvTacticalAI::FindClosestOperationUnit(CvPlot* pTarget, bool bSafeForRanged
 
 	bool rtnValue = false;
 	m_CurrentMoveUnits.clear();
+#ifdef RAI_NO_RANGED_STUPIDITY
+	CvTacticalAnalysisCell* pCell;
+	int iPlotIndex;
+	bool bMultipleTurnDanger;
+#endif
 
 	// Loop through all units available to operation
 	for(it = m_OperationUnits.begin(); it != m_OperationUnits.end(); it++)
@@ -11574,6 +11751,32 @@ bool CvTacticalAI::FindClosestOperationUnit(CvPlot* pTarget, bool bSafeForRanged
 
 				if(iTurns != MAX_INT)
 				{
+#ifdef RAI_NO_RANGED_STUPIDITY
+					if (iTurns > 1 && bSafeForRanged)
+					{
+						// Check adjacent plots to see if there's danger. If there is, this plot actually isn't safe for moving there over multiple turns
+						bMultipleTurnDanger = false;
+						CvPlot* pAdjacentPlot;
+						for (int jJ = 0; jJ < NUM_DIRECTION_TYPES; jJ++)
+						{
+							pAdjacentPlot = plotDirection(pTarget->getX(), pTarget->getY(), ((DirectionTypes)jJ));
+							if (pAdjacentPlot != NULL)
+							{
+								iPlotIndex = GC.getMap().plotNum(pAdjacentPlot->getX(), pAdjacentPlot->getY());
+								pCell = m_pMap->GetCell(iPlotIndex);
+								if (pCell && pCell->IsSubjectToAttack())
+								{
+									bMultipleTurnDanger = true;
+									break;
+								}
+							}
+						}
+						if (bMultipleTurnDanger)
+						{
+							continue;
+						}
+					}
+#endif
 #ifdef AUI_TACTICAL_PARATROOPERS_PARADROP
 					bool bWillParadrop = false;
 					if (pLoopUnit->getDropRange() > 0)
@@ -14082,15 +14285,24 @@ void CvTacticalAI::ScoreHedgehogPlots(CvPlot* pTarget)
 				if(pCell->IsSubjectToAttack())
 				{
 					iScore += 100;
+#ifndef RAI_NO_RANGED_STUPIDITY
 					bSafeFromAttack = false;
+#endif
 				}
 				if(pCell->IsEnemyCanMovePast())
 				{
 					iScore += 50;
+#ifdef RAI_NO_RANGED_STUPIDITY
+					bSafeFromAttack = false;
+#endif
 				}
 				if(pPlot->isCity() && pPlot->getOwner() == m_pPlayer->GetID())
 				{
+#ifdef RAI_NO_RANGED_STUPIDITY
+					iScore += 200;
+#else
 					iScore += 100;
+#endif
 				}
 				else
 				{
