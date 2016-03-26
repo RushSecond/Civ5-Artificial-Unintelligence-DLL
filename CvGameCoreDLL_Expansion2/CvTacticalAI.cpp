@@ -2235,6 +2235,9 @@ bool CvTacticalAI::PlotCaptureCityMoves()
 			CvCity* pCity = pPlot->getPlotCity();
 			if (pCity != NULL)
 			{
+#ifdef RAI_NO_MELEE_SUICIDE
+				UpdateSelfDamageRecklessness(pCity->getOwner());
+#endif
 				// If don't have units to actually conquer, get out.
 #ifdef AUI_TACTICAL_PARATROOPERS_PARADROP
 				if (!FindUnitsWithinStrikingDistance(pPlot, 1, 0, true /*bNoRangedUnits*/, false /*bNavalOnly*/, false /*bMustMoveThrough*/, true /*bIncludeBlockedUnits*/,
@@ -2342,6 +2345,9 @@ bool CvTacticalAI::PlotDamageCityMoves()
 			CvCity* pCity = pPlot->getPlotCity();
 			if (pCity != NULL)
 			{
+#ifdef RAI_NO_MELEE_SUICIDE
+				UpdateSelfDamageRecklessness(pCity->getOwner());
+#endif
 				//If don't have units nearby to actually conquer, and bad dominance flag, get out.
 				if (!FindUnitsWithinStrikingDistance(pPlot, 2, 0, true /*bNoRangedUnits*/, false /*bNavalOnly*/, false /*bMustMoveThrough*/, true /*bIncludeBlockedUnits*/))
 				{
@@ -2479,6 +2485,9 @@ void CvTacticalAI::PlotDestroyUnitMoves(AITacticalTargetType targetType, bool bM
 					GC.getUnitInfo(pDefender->getUnitType())->GetDescription(), pDefender->getX(), pDefender->getY());
 				LogTacticalMessage(strLogString);
 			}
+#endif
+#ifdef RAI_NO_MELEE_SUICIDE
+			UpdateSelfDamageRecklessness(pDefender->getOwner());
 #endif
 #ifdef AUI_TACTICAL_PARATROOPERS_PARADROP
 			bUnitCanAttack = FindUnitsWithinStrikingDistance(pPlot, 1, 0, false /* bNoRangedUnits */, false, false, false, false, false, true /* bIgnoreParadrop */);
@@ -5398,6 +5407,9 @@ void CvTacticalAI::ClearEnemiesNearArmy(CvArmyAI* pArmy)
 							UnitHandle pDefender = pPlot->getVisibleEnemyDefender(m_pPlayer->GetID());
 							if(pDefender)
 							{
+#ifdef RAI_NO_MELEE_SUICIDE
+								UpdateSelfDamageRecklessness(pDefender->getOwner());
+#endif
 								m_AllTargets[iI].SetAuxIntData(pDefender->GetCurrHitPoints());
 								m_CurrentMoveCities.clear();
 #ifdef AUI_TACTICAL_PARATROOPERS_PARADROP
@@ -6778,6 +6790,88 @@ void CvTacticalAI::ExecuteAttack(CvTacticalTarget* pTarget, CvPlot* pTargetPlot,
 	}
 #endif**/
 
+#ifdef RAI_AI_SEES_ALL_TARGETS
+	// If we can't legally see the target, start by moving a unit into sight range. Have to keep up appearances!
+	if (!pTargetPlot->isVisible(m_pPlayer->getTeam()))
+	{
+		UnitHandle pUnit = m_pPlayer->getUnit(m_SightUnit.GetID());
+		if (pUnit)
+		{
+			// Are we a melee unit
+			if (!pUnit->IsCanAttackRanged())
+			{
+				// Not adjacent
+				if (plotDistance(pUnit->getX(), pUnit->getY(), pTargetPlot->getX(), pTargetPlot->getY()) > 1)
+				{
+					// Make a list of adjacent plots
+#ifdef AUI_FIX_FFASTVECTOR_ERASE
+					FFastVector<CvPlot *, false, NUM_DIRECTION_TYPES> plotList;
+#else
+					std::vector<CvPlot *> plotList;
+#endif // AUI_FIX_FFASTVECTOR_ERASE
+					for (int iDirectionLoop = 0; iDirectionLoop < NUM_DIRECTION_TYPES; ++iDirectionLoop)
+					{
+						CvPlot* pAdjacentPlot = plotDirection(pTargetPlot->getX(), pTargetPlot->getY(), ((DirectionTypes)iDirectionLoop));
+						if (pAdjacentPlot)
+						{
+							int iPlotIndex = GC.getMap().plotNum(pAdjacentPlot->getX(), pAdjacentPlot->getY());
+							CvTacticalAnalysisCell *pCell = m_pMap->GetCell(iPlotIndex);
+							if (pAdjacentPlot != NULL && pAdjacentPlot->getNumDefenders(pTarget->GetTargetPlayer()) == 0 && !pCell->IsEnemyCity())
+							{
+								plotList.push_back(pAdjacentPlot);
+							}
+						}
+					}
+
+					// Find spaces adjacent to target we can move into with MP left
+#ifdef AUI_FIX_FFASTVECTOR_ERASE
+					FFastVector<CvPlot*>::iterator it;
+#else
+					std::vector<CvPlot*>::iterator it;
+#endif // AUI_FIX_FFASTVECTOR_ERASE
+
+					for (it = plotList.begin(); it != plotList.end(); it++)
+					{
+						if (TurnsToReachTarget(pUnit, *it, false /*bReusePaths*/, false /*bIgnoreUnits*/, false /*bIgnoreStacking*/) == 0)
+						{
+							// Move up there
+							pUnit->PushMission(CvTypes::getMISSION_MOVE_TO(), (*it)->getX(), (*it)->getY());
+							plotList.erase(it);
+							break;
+						}
+					}
+				}
+			}
+			else // We are ranged
+			{
+				CvPlot*	repositionPlot = GetBestRepositionPlot(pUnit, pTargetPlot);
+
+				if (repositionPlot != NULL)
+				{
+					if (GC.getLogging() && GC.getAILogging())
+					{
+						CvString strMsg;
+						strMsg.Format("Repositioning ranged unit from X: %d, Y: %d to X: %d, Y: %d", pUnit->getX(), pUnit->getY(), repositionPlot->getX(), repositionPlot->getY());
+						LogTacticalMessage(strMsg);
+					}
+
+					pUnit->PushMission(CvTypes::getMISSION_MOVE_TO(), repositionPlot->getX(), repositionPlot->getY());
+				}
+			}
+		}
+		else
+		{
+			if (GC.getLogging() && GC.getAILogging())
+			{
+				CvString strMsg;
+				strMsg.Format("ExecuteAttack can't see the target and can't get the unit handle of m_SightUnit");
+				LogTacticalMessage(strMsg);
+			}
+		}
+	}
+	
+#endif
+
 #ifdef AUI_TACTICAL_TWEAKED_EXECUTE_ATTACK
 	// Start by sending possible air sweeps
 	for (unsigned int iI = 0; iI < m_CurrentAirUnits.size(); iI++)
@@ -6885,7 +6979,7 @@ void CvTacticalAI::ExecuteAttack(CvTacticalTarget* pTarget, CvPlot* pTargetPlot,
 #endif
 	{
 #ifdef RAI_NO_MELEE_SUICIDE
-		if (IsMeleeAttackCorrect(&(m_CurrentMoveUnits[iI]), pTargetPlot, bInflictWhatWeTake, dSelfDamageRecklessness))			
+		if (IsMeleeAttackCorrect(&(m_CurrentMoveUnits[iI]), pTargetPlot, bInflictWhatWeTake))			
 #else
 		if ((!bInflictWhatWeTake) || m_CurrentMoveUnits[iI].GetExpectedTargetDamage() >= m_CurrentMoveUnits[iI].GetExpectedSelfDamage() * dSelfDamageRecklessness)		
 #endif
@@ -7032,7 +7126,7 @@ void CvTacticalAI::ExecuteAttack(CvTacticalTarget* pTarget, CvPlot* pTargetPlot,
 #endif
 	{
 #ifdef RAI_NO_MELEE_SUICIDE
-		if (IsMeleeAttackCorrect(&(m_CurrentMoveUnits[iI]), pTargetPlot, bInflictWhatWeTake, dSelfDamageRecklessness))
+		if (IsMeleeAttackCorrect(&(m_CurrentMoveUnits[iI]), pTargetPlot, bInflictWhatWeTake))
 #else
 		if (!bInflictWhatWeTake || m_CurrentMoveUnits[iI].GetExpectedTargetDamage() >= m_CurrentMoveUnits[iI].GetExpectedSelfDamage() * dSelfDamageRecklessness)
 #endif	
@@ -7192,7 +7286,7 @@ void CvTacticalAI::ExecuteAttack(CvTacticalTarget* pTarget, CvPlot* pTargetPlot,
 	for (unsigned int iI = 0; iI < m_CurrentMoveUnits.size() && iDamageRemaining > 0; iI++)
 	{
 #ifdef RAI_NO_MELEE_SUICIDE
-		if (IsMeleeAttackCorrect(&(m_CurrentMoveUnits[iI]), pTargetPlot, bInflictWhatWeTake, dSelfDamageRecklessness))
+		if (IsMeleeAttackCorrect(&(m_CurrentMoveUnits[iI]), pTargetPlot, bInflictWhatWeTake))
 #else
 		if (!bInflictWhatWeTake || m_CurrentMoveUnits[iI].GetExpectedTargetDamage() >= m_CurrentMoveUnits[iI].GetExpectedSelfDamage() * dSelfDamageRecklessness)
 #endif	
@@ -7401,7 +7495,7 @@ void CvTacticalAI::ExecuteAttack(CvTacticalTarget* pTarget, CvPlot* pTargetPlot,
 	for (unsigned int iI = 0; iI < apMeleeUnitsBlocked.size() && iDamageRemaining > 0; iI++)
 	{
 #ifdef RAI_NO_MELEE_SUICIDE
-		if (IsMeleeAttackCorrect(&(apMeleeUnitsBlocked[iI]), pTargetPlot, bInflictWhatWeTake, dSelfDamageRecklessness))
+		if (IsMeleeAttackCorrect(&(apMeleeUnitsBlocked[iI]), pTargetPlot, bInflictWhatWeTake))
 #else
 		if (!bInflictWhatWeTake || apMeleeUnitsBlocked[iI].GetExpectedTargetDamage() >= apMeleeUnitsBlocked[iI].GetExpectedSelfDamage() * dSelfDamageRecklessness)
 #endif	
@@ -10071,6 +10165,9 @@ bool CvTacticalAI::ExecuteFlankAttack(CvTacticalTarget& kTarget)
 				UnitHandle pDefender = pTargetPlot->getVisibleEnemyDefender(m_pPlayer->GetID());
 				if(pDefender)
 				{
+#ifdef RAI_NO_MELEE_SUICIDE
+					UpdateSelfDamageRecklessness(pDefender->getOwner());
+#endif
 					kTarget.SetAuxIntData(pDefender->GetCurrHitPoints());
 					m_CurrentMoveCities.clear();
 #ifdef AUI_TACTICAL_PARATROOPERS_PARADROP
@@ -10079,14 +10176,10 @@ bool CvTacticalAI::ExecuteFlankAttack(CvTacticalTarget& kTarget)
 					if(FindUnitsWithinStrikingDistance(pTargetPlot, 1, 0, false /* bNoRangedUnits */))
 #endif // AUI_TACTICAL_PARATROOPERS_PARADROP
 					{
-						
-#ifdef RAI_NO_MELEE_SUICIDE
-						if (ComputeTotalExpectedDamage(&kTarget, pTargetPlot) >= pDefender->GetCurrHitPoints())
-							ExecuteAttack(&kTarget, pTargetPlot, false/*bInflictWhatWeTake*/, true/*bMustSurviveAttack*/);
-						else
-							ExecuteAttack(&kTarget, pTargetPlot, true/*bInflictWhatWeTake*/, true/*bMustSurviveAttack*/);
-#else
 						ComputeTotalExpectedDamage(&kTarget, pTargetPlot);
+#ifdef RAI_NO_MELEE_SUICIDE
+						ExecuteAttack(&kTarget, pTargetPlot, true/*bInflictWhatWeTake*/, true/*bMustSurviveAttack*/);
+#else					
 						ExecuteAttack(&kTarget, pTargetPlot, false/*bInflictWhatWeTake*/, true/*bMustSurviveAttack*/);
 #endif
 					}
@@ -10915,6 +11008,7 @@ bool CvTacticalAI::FindUnitsWithinStrikingDistance(CvPlot* pTarget, int iNumTurn
 #endif
 #ifdef RAI_AI_SEES_ALL_TARGETS
 					canSeeTarget = true;
+					m_SightUnit = unit;
 #endif
 				}
 
@@ -11009,19 +11103,25 @@ bool CvTacticalAI::FindUnitsWithinStrikingDistance(CvPlot* pTarget, int iNumTurn
 									unit.SetHealthPercent(100, 100);  // Don't take damage from bombarding, so show as fully healthy
 #endif // AUI_TACTICAL_FIX_FIND_UNITS_WITHIN_STRIKING_DISTANCE_RANGED_STRENGTH
 									m_CurrentMoveUnits.push_back(unit);
+									rtnValue = true;
 #ifdef RAI_LOGGING_FIXES
 									if (GC.getLogging() && GC.getAILogging())
 									{
 										CvString strLogString;
 										strLogString.Format("Into CurrentMoveUnits: %s", GC.getUnitInfo(pLoopUnit->getUnitType())->GetDescription());
 										LogTacticalMessage(strLogString);
+										strLogString.Format("Unit extra vis: %d Base vis: %d Attack range: %d",
+											pLoopUnit->getExtraVisibilityRange(), GC.getUnitInfo(pLoopUnit->getUnitType())->GetBaseSightRange(), pLoopUnit->GetRange());
+										LogTacticalMessage(strLogString);
 									}
 #endif
-									rtnValue = true;
 #ifdef RAI_AI_SEES_ALL_TARGETS
 									// This ranged unit will be able to see the target if LOS is greater than or equal to range
-									if (pLoopUnit->getExtraVisibilityRange() + GC.getUNIT_VISIBILITY_RANGE() >= pLoopUnit->GetRange())
+									if (pLoopUnit->getExtraVisibilityRange() + GC.getUnitInfo(pLoopUnit->getUnitType())->GetBaseSightRange() >= pLoopUnit->GetRange())
+									{
 										canSeeTarget = true;
+										m_SightUnit = unit;
+									}
 #endif
 #ifdef AUI_TACTICAL_FIX_FIND_UNITS_WITHIN_STRIKING_DISTANCE_RANGED_LONG_DISTANCE
 									bIsRangedDamage = true;
@@ -11069,6 +11169,7 @@ bool CvTacticalAI::FindUnitsWithinStrikingDistance(CvPlot* pTarget, int iNumTurn
 #endif
 #ifdef RAI_AI_SEES_ALL_TARGETS
 						canSeeTarget = true;
+						m_SightUnit = unit;
 #endif
 					}
 
@@ -11097,6 +11198,7 @@ bool CvTacticalAI::FindUnitsWithinStrikingDistance(CvPlot* pTarget, int iNumTurn
 #endif
 #ifdef RAI_AI_SEES_ALL_TARGETS
 						canSeeTarget = true;
+						m_SightUnit = unit;
 #endif
 					}
 
@@ -11126,12 +11228,13 @@ bool CvTacticalAI::FindUnitsWithinStrikingDistance(CvPlot* pTarget, int iNumTurn
 #endif
 #ifdef RAI_AI_SEES_ALL_TARGETS
 						canSeeTarget = true;
+						m_SightUnit = unit;
 #endif
 					}
 				}
 			}
 		} // end unit loop
-
+	} // end all units loop
 #ifdef RAI_AI_SEES_ALL_TARGETS
 	if (!canSeeTarget)
 	{
@@ -11141,10 +11244,9 @@ bool CvTacticalAI::FindUnitsWithinStrikingDistance(CvPlot* pTarget, int iNumTurn
 			strLogString.Format("Nothing sees Target At X: %d, At Y: %d", pTarget->getX(), pTarget->getY());
 			LogTacticalMessage(strLogString);
 		}
-		return false;		
+		return false;
 	}
 #endif
-}
 
 #ifdef AUI_TACTICAL_FIND_UNITS_WITHIN_STRIKING_DISTANCE_AIR_SWEEPS
 	//AMS: As we have air units on the attack targets we should also check possible air sweeps
@@ -12004,16 +12106,33 @@ bool CvTacticalAI::IsExpectedToDamageWithRangedAttack(UnitHandle pAttacker, CvPl
 }
 
 #ifdef RAI_NO_MELEE_SUICIDE
-bool CvTacticalAI::IsMeleeAttackCorrect(CvTacticalUnit* pUnit, CvPlot* pTargetPlot,
-										bool bInflictWhatWeTake, double dSelfDamageRecklessness)
+void CvTacticalAI::UpdateSelfDamageRecklessness(PlayerTypes eEnemyPlayer)
 {
+	m_dSelfDamageRecklessness = (double)(GC.getBASE_MELEE_DAMAGE_RECKLESSNESS() + m_pPlayer->GetDiplomacyAI()->GetBoldness());
+
+	if (eEnemyPlayer != NO_PLAYER)
+	{
+		CvPlayerAI& kPlayer = GET_PLAYER(eEnemyPlayer);
+		if (kPlayer.isAlive() && atWar(kPlayer.getTeam(), m_pPlayer->getTeam()))
+		{
+			m_dSelfDamageRecklessness = (m_dSelfDamageRecklessness + GC.getMELEE_DAMAGE_RECKLESSNESS_PER_WAR_STATE() * m_pPlayer->GetDiplomacyAI()->GetWarState(eEnemyPlayer)) / 100.0;
+			return;
+		}
+	}
+
+	m_dSelfDamageRecklessness = (m_dSelfDamageRecklessness + 5 * (int)WAR_STATE_NEARLY_WON) / 100.0;
+}
+
+bool CvTacticalAI::IsMeleeAttackCorrect(CvTacticalUnit* pUnit, CvPlot* pTargetPlot,	bool bInflictWhatWeTake)
+{
+	if (!bInflictWhatWeTake)
+		return true;
+
 	int myDamage = m_pPlayer->getUnit(pUnit->GetID())->GetPower() * pUnit->GetExpectedSelfDamage();
 	CvUnit* enemyUnit = pTargetPlot->getVisibleEnemyDefender(m_pPlayer->GetID());
-
 	int theirDamage = enemyUnit->GetPower() * pUnit->GetExpectedTargetDamage();
-	double recklessnessMod = bInflictWhatWeTake ? dSelfDamageRecklessness : dSelfDamageRecklessness / 2.0;
 	 
-	return (double)theirDamage >= (double)myDamage * recklessnessMod;
+	return (double)theirDamage * m_dSelfDamageRecklessness >= (double)myDamage;
 }
 #endif
 

@@ -954,7 +954,8 @@ private:
 	int ComputeTotalExpectedBombardDamage(UnitHandle pTarget);
 	bool IsExpectedToDamageWithRangedAttack(UnitHandle pAttacker, CvPlot* pTarget);
 #ifdef RAI_NO_MELEE_SUICIDE
-	bool IsMeleeAttackCorrect(CvTacticalUnit* pUnit, CvPlot* pTargetPlot, bool bInflictWhatWeTake=true, double dSelfDamageRecklessness=120);
+	void UpdateSelfDamageRecklessness(PlayerTypes eEnemyPlayer);
+	bool IsMeleeAttackCorrect(CvTacticalUnit* pUnit, CvPlot* pTargetPlot, bool bInflictWhatWeTake=true);
 #endif
 	bool MoveToEmptySpaceNearTarget(UnitHandle pUnit, CvPlot* pTargetPlot, bool bLand=true);
 	bool MoveToEmptySpaceTwoFromTarget(UnitHandle pUnit, CvPlot* pTargetPlot, bool bLand=true);
@@ -1027,7 +1028,12 @@ private:
 	std::vector<CvTacticalCity> m_CurrentMoveCities;
 	FStaticVector<CvTacticalMove, 256, true, c_eCiv5GameplayDLL > m_MovePriorityList;
 	int m_MovePriorityTurn;
-
+#ifdef RAI_NO_MELEE_SUICIDE
+	double m_dSelfDamageRecklessness;
+#endif
+#ifdef RAI_AI_SEES_ALL_TARGETS
+	CvTacticalUnit m_SightUnit;
+#endif
 	// Data for multi-unit attacks - not serialized, cleared out for each turn
 	std::list<CvQueuedAttack> m_QueuedAttacks;
 	int m_iCurrentSeriesID;
