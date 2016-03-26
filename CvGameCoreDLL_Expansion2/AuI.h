@@ -235,6 +235,10 @@ template<class T> inline T FastMin(const T& _Left, const T& _Right) { return (_D
 /// Plots that are under immediate threat by an even number of units will properly return that the plot is under immediate threat
 #define AUI_DANGER_PLOTS_FIX_ADD_DANGER_WITHIN_ONE_MOVE
 
+// Deals Stuff
+/// Altered the way Open Borders Agreements are scored in some cases
+#define AUI_DEALAI_TWEAKED_OPEN_BORDERS_VALUE
+
 // DiplomacyAI Stuff
 /// If the first adjusted value is out of bounds, keep rerolling with the amount with which it is out of bounds until we remain in bounds
 #define AUI_DIPLOMACY_GET_RANDOM_PERSONALITY_WEIGHT_USE_REROLLS
@@ -449,17 +453,17 @@ template<class T> inline T FastMin(const T& _Left, const T& _Right) { return (_D
 /// Fixes the score divider caused by enemies on a continent if not a naval expansion map to work the other way around: now a multiplier for when there are no enemies and is a naval expansion map
 #define AUI_PLAYER_FIX_BEST_SETTLE_AREAS_NAVAL_EXPAND_HINT (3)
 /// When the settler does not have an escort, its evaluation distance is not lowered as much depending on boldness and the current era
-#define AUI_PLAYER_GET_BEST_SETTLE_PLOT_NO_ESCORT_BOLDNESS
+// #define AUI_PLAYER_GET_BEST_SETTLE_PLOT_NO_ESCORT_BOLDNESS
 /// Checks adjacent tiles for being targetted for city settling as well as the current one
 #define AUI_PLAYER_GET_BEST_SETTLE_PLOT_CHECK_ADJACENT_FOR_CITY_TARGET
 /// The evaluation distance depends on the distance from the player's city closest to the settler instead of the distance from the settler
-#define AUI_PLAYER_GET_BEST_SETTLE_PLOT_EVALDISTANCE_FOR_CLOSEST_CITY
+// #define AUI_PLAYER_GET_BEST_SETTLE_PLOT_EVALDISTANCE_FOR_CLOSEST_CITY
 /// Calls a pathfinder instead of scaling values depending on whether or not the plot is on a different landmass
 #define AUI_PLAYER_GET_BEST_SETTLE_PLOT_PATHFINDER_CALL
 /// Pathfinder used instead of raw distance, parameter dictates whether we're reusing paths (fast but rough) or not (slow but accurate)
 #define AUI_PLAYER_GET_BEST_SETTLE_PLOT_USE_PATHFINDER_FOR_EVALDISTANCE (true)
 /// If a tile is on the same continent as the player's capital and is closer to an enemy major capital than any allied cities, disregard the tile
-#define AUI_PLAYER_GET_BEST_SETTLE_PLOT_CONSIDER_ENEMY_CAPITALS
+// #define AUI_PLAYER_GET_BEST_SETTLE_PLOT_CONSIDER_ENEMY_CAPITALS
 /// Switches the function over to using the XML-loaded fertility value
 #define AUI_PLAYER_GET_BEST_SETTLE_PLOT_USE_MINIMUM_FERTILITY
 /// Minor code modifications that are minor optimizations and help with debugging
