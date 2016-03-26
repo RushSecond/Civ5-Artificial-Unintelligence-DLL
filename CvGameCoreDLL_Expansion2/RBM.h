@@ -11,6 +11,12 @@
 #define RBM_UNITS_EMBARK_USING_COMBAT_STRENGTH
 
 // Embarked units get a percentage penalty off their strength
-#define RBM_UNIT_EMBARK_PENALTY -33
+#define RBM_UNIT_EMBARK_PENALTY (-33)
+
+// Cover now defends against city attacks
+#define RBM_RANGED_DEFENSE_DEFENDS_AGAINST_CITY
+
+// Added lua support to show ranged defense from cover
+#define RBM_LUA_RANGED_DEFENSE
 
 #endif

@@ -31,18 +31,34 @@
 // Note to DelnarErsike: pNode->m_iData1 returns movement allowance remaining, TIMES 60.
 #define RAI_SEIGE_UNITS_REPOSITION_FIX
 
+#define RAI_SHOOT_AND_MOVE_PERFORMANCE
+
 // Default posture for enemy city zones is no longer surgical strike, instead it's withdraw.
 // This makes AI not attack city unitl they are READY.
-#define RAI_ONLY_ATTACK_CITY_WHEN_READY
+// #define RAI_ONLY_ATTACK_CITY_WHEN_READY
 
 // More AI logging information for CvTactialAI.cpp
 #define RAI_LOGGING_FIXES
-#define PATH_FINDER_LOGGING
+//#define PATH_FINDER_LOGGING
 
-//** DIPLOMACY AI **//
+//** DEAL AI **//
+
+// The base trade amount for third party war and defensive pact now considers military strength
+#define RAI_DEALS_CONSIDER_MILITARY_STRENGTH
+
+// Civs with low war personality can be convinced to war, but never against allies
+#define RAI_THIRD_PARTY_WAR_TWEAKS
+
+// TODO LATER
+#define RAI_THIRD_PARTY_WAR_VS_MINORS
+
+// TODO LATER
+#define RAI_DEFENSIVE_PACT_CONSIDERS_THREAT
 
 // AI weighs damage dealt to himself and damage dealt to opponent differently when considering peace deals
 #define RAI_DAMAGE_DEALT_PEACE_CHANGE
+
+//** DIPLOMACY AI **//
 
 // AI no longer takes into account player score when evaluating war score since it's a very inaccurate assessment
 #define RAI_WAR_SCORE_DOESNT_CONSIDER_PLAYER_SCORE
@@ -66,6 +82,12 @@
 // Rich AI civs will much more aggressively try to outbid others on city states
 #define RAI_RICH_AI_OUTBIDS_OTHERS_FOR_CITY_STATES
 
+// AI will be much more likely to go to war across with distant enemies in later eras
+#define RAI_DISTANT_WAR_MORE_LIKELY_IN_LATER_ERAS
+
+// AI will consider defensive pacts when deciding war approach
+#define RAI_WAR_CONSIDERS_DEFENSIVE_PACT
+
 //** UNIT AI **//
 
 // AI weighs bonus vs domain similarly now, no matter how much % it gives
@@ -88,6 +110,14 @@
 
 // AI are much less likely to send missionaries to cities without open borders
 #define RAI_RELIGION_SCORE_CITY_PENALTY_IF_NO_OPEN_BORDERS (3)
+
+//** PLAYER STUFF **//
+
+// AI is more willing to escort settlers safely, even for short distances
+#define RAI_ESCORT_SETTLERS_MORE
+
+// AI will no longer settle with an enemy city between it and safety
+#define RAI_NO_JUMP_SETTLING
 
 //** MILITARY AI **//
 
@@ -121,6 +151,7 @@
 #define RAI_DONT_WASTE_GOLD_ON_BAD_TILES
 
 
+
 //** BUX FIXES **//
 
 // AIs no longer act as though they are being ZOC'd by a unit they just killed
@@ -131,5 +162,9 @@
 
 // Danger values from cities are no longer 1/100 the intended value
 #define RAI_CITY_DANGER_FIX
+
+// AI will no longer keep their pledges to protect on a city state after they are killed
+// (this bug affects tribute attempts)
+#define RAI_KILLED_PLAYERS_DONT_PLEDGE_PROTECT
 
 #endif
