@@ -6300,6 +6300,7 @@ CvPlot* CvHomelandAI::FindArchaeologistTarget(CvUnit *pUnit, int &iSlots)
 				strLogString.Format("Site invalid, %d slots", iSlots);
 				LogHomelandMessage(strLogString);
 			}
+			m_TargetedAntiquitySites.erase(it--);
 			continue;
 		}
 		
@@ -6313,6 +6314,15 @@ CvPlot* CvHomelandAI::FindArchaeologistTarget(CvUnit *pUnit, int &iSlots)
 				iBestTurns = iTurns;
 				bBestNeedSlot = bNeedSlot;
 			}
+			else if (iTurns == MAX_INT) // This is causing a crash, but should be fixed
+			{
+				// Can't get to this site for some reason, so remove it
+				m_TargetedAntiquitySites.erase(it--);
+			}
+		}
+		else // Too dangerous!
+		{	
+			m_TargetedAntiquitySites.erase(it--);
 		}
 	}
 
