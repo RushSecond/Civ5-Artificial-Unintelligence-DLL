@@ -400,6 +400,11 @@ int CvCitySiteEvaluator::PlotFoundValue(CvPlot* pPlot, CvPlayer* pPlayer, YieldT
 	int iTotalStrategicValue = 0;
 
 	int iClosestCityOfMine = 999;
+#ifdef RAI_NO_JUMP_SETTLING
+	CvPlot* pOurCapitalPlot = NULL;
+	int iaBetweenestEnemyCityDistance[MAX_MAJOR_CIVS] = {0};
+	CvPlot* paBetweenestEnemyCityPlot[MAX_MAJOR_CIVS] = {};
+#endif
 	int iClosestEnemyCity = 999;
 
 	int iCapitalArea = NULL;
@@ -410,7 +415,14 @@ int CvCitySiteEvaluator::PlotFoundValue(CvPlot* pPlot, CvPlayer* pPlayer, YieldT
 #endif // AUI_PLOT_CALCULATE_NATURE_YIELD_USE_POTENTIAL_CIV_UNIQUE_IMPROVEMENT
 
 	if ( pPlayer->getCapitalCity() )
+#ifdef RAI_NO_JUMP_SETTLING
+	{
 		iCapitalArea = pPlayer->getCapitalCity()->getArea();
+		pOurCapitalPlot = pPlayer->getCapitalCity()->plot();
+	}
+#else
+		iCapitalArea = pPlayer->getCapitalCity()->getArea();
+#endif
 
 #ifndef AUI_PLOT_CALCULATE_NATURE_YIELD_USE_POTENTIAL_CIV_UNIQUE_IMPROVEMENT
 	// Custom code for Inca ideal terrace farm locations
@@ -431,11 +443,11 @@ int CvCitySiteEvaluator::PlotFoundValue(CvPlot* pPlot, CvPlayer* pPlayer, YieldT
 
 #ifdef AUI_HEXSPACE_DX_LOOPS
 	int iDX, iMaxDX;
-	for (int iDY = -7; iDY <= 7; iDY++)
+	for (int iDY = -10; iDY <= 10; iDY++)
 	{
 #ifdef AUI_FAST_COMP
-		iMaxDX = 7 - FASTMAX(0, iDY);
-		for (iDX = -7 - FASTMIN(0, iDY); iDX <= iMaxDX; iDX++) // MIN() and MAX() stuff is to reduce loops (hexspace!)
+		iMaxDX = 10 - FASTMAX(0, iDY);
+		for (iDX = -10 - FASTMIN(0, iDY); iDX <= iMaxDX; iDX++) // MIN() and MAX() stuff is to reduce loops (hexspace!)
 #else
 		iMaxDX = 7 - MAX(0, iDY);
 		for (iDX = -7 - MIN(0, iDY); iDX <= iMaxDX; iDX++) // MIN() and MAX() stuff is to reduce loops (hexspace!)
@@ -679,6 +691,19 @@ int CvCitySiteEvaluator::PlotFoundValue(CvPlot* pPlot, CvPlayer* pPlayer, YieldT
 					}
 					else // this tile is owned by someone else
 					{
+#ifdef RAI_NO_JUMP_SETTLING
+						int iOwner = pLoopPlot->getOwner();
+						// See if there are other cities nearby (only count major civs)
+						if (pLoopPlot->isCity() && iOwner < MAX_MAJOR_CIVS && iOwner >= 0 && pOurCapitalPlot != NULL)
+						{
+							int iDistanceToOurCap = plotDistance(pLoopPlot->getX(), pLoopPlot->getY(), pOurCapitalPlot->getX(), pOurCapitalPlot->getY());
+							if (iaBetweenestEnemyCityDistance[iOwner] == 0 || iaBetweenestEnemyCityDistance[iOwner] > iDistance + iDistanceToOurCap)
+							{
+								iaBetweenestEnemyCityDistance[iOwner] = iDistance + iDistanceToOurCap;
+								paBetweenestEnemyCityPlot[iOwner] = pLoopPlot;
+							}
+						}
+#endif
 						// See if there are other cities nearby (only count major civs)
 						if (iClosestEnemyCity > iDistance)
 						{
@@ -866,7 +891,37 @@ int CvCitySiteEvaluator::PlotFoundValue(CvPlot* pPlot, CvPlayer* pPlayer, YieldT
 			rtnValue *= 2;
 			rtnValue /= 3;
 		}
-
+#ifdef RAI_NO_JUMP_SETTLING
+		// Don't bother if we don't have a capital yet
+		if (pOurCapitalPlot != NULL)
+		{
+			CvPlot* pEnemyCapitalPlot = NULL;
+			int iOurCapitalDistance = plotDistance(pPlot->getX(), pPlot->getY(), pOurCapitalPlot->getX(), pOurCapitalPlot->getY());
+			for (int iI = 0; iI < MAX_MAJOR_CIVS; iI++)
+			{
+				if (paBetweenestEnemyCityPlot[iI] != NULL)
+				{
+					pEnemyCapitalPlot = GET_PLAYER((PlayerTypes)iI).getCapitalCity()->plot();
+				/*	if (Settle: an enemy city is closer than any of our cities (our capital?)
+					&& (Our capital: same enemy city is closer than settle
+					&& (Settle: that enemy city is their capital, or enemy capital closer than our capital
+					then this is a jump settle and it should STOP */
+					if (iaBetweenestEnemyCityDistance[iI] < iOurCapitalDistance)
+					{
+						if (plotDistance(paBetweenestEnemyCityPlot[iI]->getX(), paBetweenestEnemyCityPlot[iI]->getY(),
+						pOurCapitalPlot->getX(), pOurCapitalPlot->getY()) < iOurCapitalDistance)
+						{
+							if (paBetweenestEnemyCityPlot[iI]->getPlotCity()->isCapital()
+								|| plotDistance(pEnemyCapitalPlot->getX(), pEnemyCapitalPlot->getY(), pPlot->getX(), pPlot->getY()) < iOurCapitalDistance)
+							{
+								rtnValue = 0;
+							}
+						}
+					}
+				}
+			}
+		}
+#endif // RAI_NO_JUMP_SETTLING
 		// use boldness to decide if we want to push close to enemies
 		int iBoldness = pPlayer->GetDiplomacyAI()->GetBoldness();
 		if (iBoldness < 4)
