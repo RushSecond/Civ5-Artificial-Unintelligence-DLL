@@ -15778,6 +15778,9 @@ void CvPlayer::setAlive(bool bNewValue, bool bNotify)
 			{
 				PlayerTypes eOtherPlayer = (PlayerTypes) iPlayerLoop;
 				GET_PLAYER(eOtherPlayer).GetMinorCivAI()->ResetFriendshipWithMajor(GetID());
+#ifdef RAI_KILLED_PLAYERS_DONT_PLEDGE_PROTECT
+				GC.getGame().DoMinorPledgeProtection(GetID(), eOtherPlayer, false);
+#endif
 			}
 
 			setTurnActive(false);
@@ -23887,8 +23890,12 @@ CvPlot* CvPlayer::GetBestSettlePlot(CvUnit* pUnit, bool bEscorted, int iArea) co
 		iEvalDistance *= MIN(int(5.5 + sqrt(MAX(GetDiplomacyAI()->GetBoldness() + (double)GetCurrentEra(), 0.0))), 12);
 		iEvalDistance /= 12;
 #else
+#ifdef RAI_ESCORT_SETTLERS_MORE
+		iEvalDistance /= 2;
+#else
 		iEvalDistance *= 2;
 		iEvalDistance /= 3;
+#endif
 #endif // AUI_PLAYER_GET_BEST_SETTLE_PLOT_NO_ESCORT_BOLDNESS
 	}
 
@@ -24004,9 +24011,6 @@ CvPlot* CvPlayer::GetBestSettlePlot(CvUnit* pUnit, bool bEscorted, int iArea) co
 				if (iBestDistance < MAX_INT)
 					iSettlerDistance = iBestDistance;
 				else if (AUI_PLAYER_GET_BEST_SETTLE_PLOT_USE_PATHFINDER_FOR_EVALDISTANCE &&
-#else
-				if (AUI_PLAYER_GET_BEST_SETTLE_PLOT_USE_PATHFINDER_FOR_EVALDISTANCE &&
-#endif // AUI_PLAYER_GET_BEST_SETTLE_PLOT_EVALDISTANCE_FOR_CLOSEST_CITY
 					GC.getIgnoreUnitsPathFinder().GeneratePath(iSettlerX, iSettlerY, pPlot->getX(), pPlot->getY(), iFlags, true))
 				{
 					pNode = GC.getIgnoreUnitsPathFinder().GetLastNode();
@@ -24022,6 +24026,26 @@ CvPlot* CvPlayer::GetBestSettlePlot(CvUnit* pUnit, bool bEscorted, int iArea) co
 				}
 				if (iSettlerDistance < MAX_INT)
 					iSettlerDistance *= pUnit->maxMoves() / GC.getMOVE_DENOMINATOR();
+#else // use pathfinder w/o closest city
+				pNode = NULL;
+
+				if (AUI_PLAYER_GET_BEST_SETTLE_PLOT_USE_PATHFINDER_FOR_EVALDISTANCE &&
+					GC.getIgnoreUnitsPathFinder().GeneratePath(iSettlerX, iSettlerY, pPlot->getX(), pPlot->getY(), iFlags, true))
+				{
+					pNode = GC.getIgnoreUnitsPathFinder().GetLastNode();
+				}
+				else if (!AUI_PLAYER_GET_BEST_SETTLE_PLOT_USE_PATHFINDER_FOR_EVALDISTANCE &&
+					GC.GetTacticalAnalysisMapFinder().GeneratePath(iSettlerX, iSettlerY, pPlot->getX(), pPlot->getY(), iFlags, false))
+				{
+					pNode = GC.GetTacticalAnalysisMapFinder().GetLastNode();
+				}
+				if (iSettlerDistance == MAX_INT && pNode)
+				{
+					iSettlerDistance = pNode->m_iData2;
+				}
+				if (iSettlerDistance < MAX_INT)
+					iSettlerDistance *= pUnit->maxMoves() / GC.getMOVE_DENOMINATOR();
+#endif // AUI_PLAYER_GET_BEST_SETTLE_PLOT_EVALDISTANCE_FOR_CLOSEST_CITY
 #else
 #ifdef AUI_PLAYER_GET_BEST_SETTLE_PLOT_EVALDISTANCE_FOR_CLOSEST_CITY
 				iLoop = 0;
