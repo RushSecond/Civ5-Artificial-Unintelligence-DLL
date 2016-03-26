@@ -2326,7 +2326,11 @@ void CvMilitaryAI::UpdateBaseData()
 		dNumUnitsWanted += m_pPlayer->GetDiplomacyAI()->GetBoldness();
 
 		// add in more if we are playing on a high difficulty
+#ifdef RAI_LESS_MILITARY_RESERVES_FOR_HIGHER_DIFFICULTY
+		dNumUnitsWanted += iDifficulty*2;
+#else
 		dNumUnitsWanted += iDifficulty;
+#endif
 
 		dNumUnitsWanted = dNumUnitsWanted * dMultiplier;
 
