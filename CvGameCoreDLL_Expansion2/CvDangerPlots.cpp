@@ -131,7 +131,11 @@ void CvDangerPlots::UpdateDanger(bool bPretendWarWithAllCivs, bool bIgnoreVisibi
 			int iRange = pLoopUnit->baseMoves();
 			if(pLoopUnit->canRangeStrike())
 			{
+#ifdef RAI_SHOOT_AND_MOVE_PERFORMANCE
+				iRange += FASTMAX(0, pLoopUnit->GetRange() - 1);
+#else
 				iRange += pLoopUnit->GetRange();
+#endif
 			}
 
 			CvPlot* pUnitPlot = pLoopUnit->plot();
@@ -704,10 +708,14 @@ void CvDangerPlots::AssignUnitDangerValue(CvUnit* pUnit, CvPlot* pPlot)
 					iBaseUnitCombatValue = pUnit->GetMaxRangedCombatStrength(NULL, NULL, true, true) * iCombatValueCalc;
 #endif // AUI_DANGER_PLOTS_ADD_DANGER_CONSIDER_TERRAIN_STRENGTH_MODIFICATION
 #ifdef AUI_UNIT_CAN_MOVE_AND_RANGED_STRIKE
+#ifdef RAI_SHOOT_AND_MOVE_PERFORMANCE // Ranged units only ever get to this point if they CAN move and ranged strike the tile
+				iTurnsAway = 1;
+#else
 				if (pUnit->canMoveAndRangedStrike(iPlotX, iPlotY))
 				{
 					iTurnsAway = 1;
 				}
+#endif
 #else
 				if (pUnit->canEverRangeStrikeAt(iPlotX, iPlotY))
 				{

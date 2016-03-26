@@ -367,7 +367,12 @@ void CvTacticalAnalysisMap::MarkCellsNearEnemy()
 #ifdef AUI_TACTICAL_ANALYSIS_MAP_MARKING_ADJUST_RANGED
 #ifdef AUI_UNIT_CAN_MOVE_AND_RANGED_STRIKE
 								// Pathfinder gets called twice for ranged units unfortunately: once for moving, second time for move and shoot calculation
+#ifdef RAI_SHOOT_AND_MOVE_PERFORMANCE // Don't bother with this second pathfinding calculation if we already know this plot can be attacked
+								if (!m_pPlots[iI].IsSubjectToAttack() &&
+									(iTurnsToReach <= 1 || (iTurnsToReach < 4 && pUnit->isRanged() && pUnit->canMoveAndRangedStrike(pPlot->getX(), pPlot->getY()))))
+#else
 								if (iTurnsToReach <= 1 || (iTurnsToReach < 4 && pUnit->isRanged() && pUnit->canMoveAndRangedStrike(pPlot->getX(), pPlot->getY())))
+#endif // RAI_SHOOT_AND_MOVE_PERFORMANCE
 #else
 								// rough adjustment to account for ranged units
 								if (iTurnsToReach <= 1 || (pUnit->isRanged() && iTurnsToReach <= 2))

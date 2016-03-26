@@ -11186,9 +11186,10 @@ int CvUnit::GetMaxRangedCombatStrength(const CvUnit* pOtherUnit, const CvCity* p
 		// Ranged DEFENSE
 		else
 		{
+#ifndef RBM_RANGED_DEFENSE_DEFENDS_AGAINST_CITY
 			// Ranged Defense Mod
 			iModifier += rangedDefenseModifier();
-
+#endif
 			// Unit Class Defense Mod
 			iModifier += unitClassDefenseModifier(pOtherUnit->getUnitClassType());
 		}
@@ -11240,6 +11241,11 @@ int CvUnit::GetMaxRangedCombatStrength(const CvUnit* pOtherUnit, const CvCity* p
 			iModifier += iTempModifier;
 
 		iModifier += getDefenseModifier();
+
+#ifdef RBM_RANGED_DEFENSE_DEFENDS_AGAINST_CITY
+		// Ranged Defense Mod
+		iModifier += rangedDefenseModifier();
+#endif
 	}
 
 	// Unit can't drop below 10% strength
@@ -18769,7 +18775,24 @@ void CvUnit::GetMovablePlotListOpt(FFastVector<CvPlot*>& plotData, CvPlot* pTarg
 		bIsParthian = true;
 	}
 	if (iWithinTurns == 0)
-	{
+	{		
+#ifdef RAI_SHOOT_AND_MOVE_PERFORMANCE
+		// Now use hex loops to check only the plots where you could possibly shoot from
+		int iRange = GetRange();
+		int iMaxDX;
+		for (iDY = -iRange; iDY <= iRange; iDY++)
+		{
+#ifdef AUI_FAST_COMP
+			iMaxDX = iRange - FASTMAX(0, iDY);
+			for (iDX = -iRange - FASTMIN(0, iDY); iDX <= iMaxDX; iDX++) // MIN() and MAX() stuff is to reduce loops (hexspace!)
+			{
+#else
+			iMaxDX = 7 - MAX(0, iDY);
+			for (iDX = -7 - MIN(0, iDY); iDX <= iMaxDX; iDX++) // MIN() and MAX() stuff is to reduce loops (hexspace!)
+			{
+#endif // AUI_FAST_COMP
+				pLoopPlot = plotXY(pTarget->getX(), pTarget->getY(), iDX, iDY);
+#else
 		int xMin, xMax, yMin, yMax;
 		if (isRanged())
 		{
@@ -18802,7 +18825,7 @@ void CvUnit::GetMovablePlotListOpt(FFastVector<CvPlot*>& plotData, CvPlot* pTarg
 				if (GC.getMap().isPlot(iDX, iDY))
 				{
 					pLoopPlot = GC.getMap().plotCheckInvalid(iDX, iDY);
-
+#endif // RAI_SHOOT_AND_MOVE_PERFORMANCE
 					// Check is empty plot not in current data set
 					if (pLoopPlot && !(bIsParthian && pLoopPlot->getNumTimesInList(plotData, true) == 0))
 					{
@@ -18852,7 +18875,7 @@ void CvUnit::GetMovablePlotListOpt(FFastVector<CvPlot*>& plotData, CvPlot* pTarg
 							if (pNode)
 							{
 #ifdef RAI_SEIGE_UNITS_REPOSITION_FIX
-								if (pNode->m_iData2 == 1 && pNode->m_iData1 > getMustSetUpToRangedAttackCount() * 60)
+								if (pNode->m_iData2 == 1 && pNode->m_iData1 > getMustSetUpToRangedAttackCount() * GC.getMOVE_DENOMINATOR())
 #else
 								if (pNode->m_iData2 == 1 && pNode->m_iData1 > getMustSetUpToRangedAttackCount())
 #endif
@@ -18867,7 +18890,9 @@ void CvUnit::GetMovablePlotListOpt(FFastVector<CvPlot*>& plotData, CvPlot* pTarg
 							}
 						}
 					}
+#ifndef RAI_SHOOT_AND_MOVE_PERFORMANCE
 				}
+#endif
 			}
 		}
 	}
