@@ -1509,11 +1509,13 @@ int CvDealAI::GetOpenBordersValue(bool bFromMe, PlayerTypes eOtherPlayer, bool b
 	CvAssertMsg(GetPlayer()->GetID() != eOtherPlayer, "DEAL_AI: Trying to check value of Open Borders with oneself.  Please send Jon this with your last 5 autosaves and what changelist # you're playing.");
 
 	MajorCivApproachTypes eApproach = GetPlayer()->GetDiplomacyAI()->GetMajorCivApproach(eOtherPlayer, /*bHideTrueFeelings*/ true);
-
+#ifdef AUI_DEALAI_TWEAKED_OPEN_BORDERS_VALUE
+	CvPlayer &kOtherPlayer = GET_PLAYER(eOtherPlayer);
+#else
 	// If we're friends, then OB is always equally valuable to both parties
 	if(eApproach == MAJOR_CIV_APPROACH_FRIENDLY)
 		return 50;
-
+#endif
 	int iItemValue = 0;
 
 	// Me giving Open Borders to the other guy
@@ -1544,6 +1546,10 @@ int CvDealAI::GetOpenBordersValue(bool bFromMe, PlayerTypes eOtherPlayer, bool b
 		}
 
 		// Opinion also matters
+#ifdef AUI_DEALAI_TWEAKED_OPEN_BORDERS_VALUE
+		// If we're friends, then OB is always equally valuable to both parties
+		if (eApproach != MAJOR_CIV_APPROACH_FRIENDLY)
+#endif
 		switch(GetPlayer()->GetDiplomacyAI()->GetMajorCivOpinion(eOtherPlayer))
 		{
 		case MAJOR_CIV_OPINION_ALLY:
@@ -1574,9 +1580,29 @@ int CvDealAI::GetOpenBordersValue(bool bFromMe, PlayerTypes eOtherPlayer, bool b
 			CvAssertMsg(false, "DEAL_AI: AI player has no valid Opinion for Open Borders valuation.  Please send Jon this with your last 5 autosaves and what changelist # you're playing.")
 			break;
 		}
-
+#ifdef AUI_DEALAI_TWEAKED_OPEN_BORDERS_VALUE
+		int iNumEnemiesAtWarWith = 0;
+		for (int iI = 0; iI < MAX_MAJOR_CIVS; iI++)
+		{
+			if ((PlayerTypes)iI != eOtherPlayer && (PlayerTypes)iI != GetPlayer()->GetID())
+			{
+				WarStateTypes eWarState = kOtherPlayer.GetDiplomacyAI()->GetWarState((PlayerTypes)iI);
+				if (eWarState > WAR_STATE_NEARLY_DEFEATED && eWarState != WAR_STATE_NEARLY_WON)
+				{
+					if (GetPlayer()->GetDiplomacyAI()->GetMajorCivOpinion(eOtherPlayer) > GetPlayer()->GetDiplomacyAI()->GetMajorCivOpinion((PlayerTypes)iI))
+					{
+						if (GetPlayer()->GetProximityToPlayer((PlayerTypes)iI) >= kOtherPlayer.GetProximityToPlayer((PlayerTypes)iI))
+						{
+							iNumEnemiesAtWarWith++;
+						}
+					}
+				}
+			}
+		}
+#else
 		// If they're at war with our enemies then we're more likely to give them OB
 		int iNumEnemiesAtWarWith = GetPlayer()->GetDiplomacyAI()->GetNumOurEnemiesPlayerAtWarWith(eOtherPlayer);
+#endif	
 		if(iNumEnemiesAtWarWith >= 2)
 		{
 			iItemValue *= 10;
@@ -1592,8 +1618,9 @@ int CvDealAI::GetOpenBordersValue(bool bFromMe, PlayerTypes eOtherPlayer, bool b
 		AIGrandStrategyTypes eCultureStrategy = (AIGrandStrategyTypes) GC.getInfoTypeForString("AIGRANDSTRATEGY_CULTURE");
 		if (eCultureStrategy != NO_AIGRANDSTRATEGY && GetPlayer()->GetGrandStrategyAI()->GetGuessOtherPlayerActiveGrandStrategy(eOtherPlayer) == eCultureStrategy)
 		{
+#ifndef AUI_DEALAI_TWEAKED_OPEN_BORDERS_VALUE
 			CvPlayer &kOtherPlayer = GET_PLAYER(eOtherPlayer);
-
+#endif
 			// If he has tourism and he's not influential on us yet, resist!
 			if (kOtherPlayer.GetCulture()->GetTourism() > 0 && kOtherPlayer.GetCulture()->GetInfluenceOn(GetPlayer()->GetID()) < INFLUENCE_LEVEL_INFLUENTIAL)
 			{
@@ -1689,6 +1716,58 @@ int CvDealAI::GetDefensivePactValue(bool bFromMe, PlayerTypes eOtherPlayer, bool
 
 	int iItemValue;
 
+#ifdef RAI_DEALS_CONSIDER_MILITARY_STRENGTH
+	// Only calculate one way
+	if(bFromMe)
+	{
+		// What is this defensive pact worth to them
+		iItemValue = GetPlayer()->GetMilitaryMight() * GC.getDEFENSIVE_PACT_MILITARY_STRENGTH_FACTOR() / 100;
+
+		// What is this defensive pact worth to us
+		iItemValue -= GET_PLAYER(eOtherPlayer).GetMilitaryMight() * GC.getDEFENSIVE_PACT_MILITARY_STRENGTH_FACTOR() / 100;
+
+		// Modify by opinion
+		switch(GetPlayer()->GetDiplomacyAI()->GetMajorCivOpinion(eOtherPlayer))
+		{
+		case MAJOR_CIV_OPINION_ALLY:
+			if (iItemValue > 0)
+				iItemValue = 0;
+			break;
+		case MAJOR_CIV_OPINION_FRIEND:
+			if (iItemValue > 0)
+				iItemValue /= 2;
+			break;
+		case MAJOR_CIV_OPINION_FAVORABLE:
+		case MAJOR_CIV_OPINION_NEUTRAL:
+			break;
+		case MAJOR_CIV_OPINION_COMPETITOR:
+			iItemValue = 100000;
+			break;
+		case MAJOR_CIV_OPINION_ENEMY:
+			iItemValue = 100000;
+			break;
+		case MAJOR_CIV_OPINION_UNFORGIVABLE:
+			iItemValue = 100000;
+			break;
+		default:
+			CvAssertMsg(false, "DEAL_AI: AI player has no valid Opinion for Defensive Pact valuation.  Please send Jon this with your last 5 autosaves and what changelist # you're playing.")
+			iItemValue = 100000;
+			break;
+		}
+	}
+	else
+	{
+		return 0;
+	}
+
+	// Are we trying to find the middle point between what we think this item is worth and what another player thinks it's worth?
+	if(bUseEvenValue)
+	{
+		iItemValue -= GET_PLAYER(eOtherPlayer).GetDealAI()->GetDefensivePactValue(bFromMe, GetPlayer()->GetID(), /*bUseEvenValue*/ false);
+
+		iItemValue /= 2;
+	}
+#else
 	// What is a Defensive Pact with eOtherPlayer worth to US?
 	if(!bFromMe)
 	{
@@ -1789,6 +1868,7 @@ int CvDealAI::GetDefensivePactValue(bool bFromMe, PlayerTypes eOtherPlayer, bool
 
 		iItemValue /= 2;
 	}
+#endif
 
 	return iItemValue;
 }
@@ -2064,9 +2144,10 @@ int CvDealAI::GetThirdPartyWarValue(bool bFromMe, PlayerTypes eOtherPlayer, Team
 
 	// How much does this AI like to go to war? If it's a 3 or less, never accept
 	int iWarApproachWeight = pDiploAI->GetPersonalityMajorCivApproachBias(MAJOR_CIV_APPROACH_WAR);
+#ifndef RAI_THIRD_PARTY_WAR_TWEAKS
 	if(bFromMe && iWarApproachWeight < 4)
 		return 100000;
-
+#endif
 
 	PlayerTypes eWithPlayer = NO_PLAYER;
 	// find the first player associated with the team
@@ -2080,8 +2161,9 @@ int CvDealAI::GetThirdPartyWarValue(bool bFromMe, PlayerTypes eOtherPlayer, Team
 		}
 	}
 	WarProjectionTypes eWarProjection = pDiploAI->GetWarProjection(eWithPlayer);
-
+#ifndef RAI_DEALS_CONSIDER_MILITARY_STRENGTH
 	EraTypes eOurEra = GET_TEAM(GetPlayer()->getTeam()).GetCurrentEra();
+#endif
 
 	MajorCivOpinionTypes eOpinionTowardsAskingPlayer = pDiploAI->GetMajorCivOpinion(eOtherPlayer);
 	MajorCivOpinionTypes eOpinionTowardsWarPlayer = NO_MAJOR_CIV_OPINION_TYPE;
@@ -2102,6 +2184,17 @@ int CvDealAI::GetThirdPartyWarValue(bool bFromMe, PlayerTypes eOtherPlayer, Team
 	// From me
 	if(bFromMe)
 	{
+#ifdef RAI_DEALS_CONSIDER_MILITARY_STRENGTH
+		iItemValue = m_pPlayer->GetMilitaryMight() * GC.getTHIRD_PARTY_WAR_MILITARY_STRENGTH_FACTOR() / 100;
+		if(eWarProjection >= WAR_PROJECTION_GOOD)
+			iItemValue = (iItemValue * 2) / 3;
+		else if(eWarProjection == WAR_PROJECTION_UNKNOWN)
+		{}
+		else if(eWarProjection == WAR_PROJECTION_STALEMATE)
+			iItemValue = (iItemValue * 2);
+		else
+			iItemValue = 50000;
+#else
 		if(eWarProjection >= WAR_PROJECTION_GOOD)
 			iItemValue = 400;
 		else if(eWarProjection == WAR_PROJECTION_UNKNOWN)
@@ -2114,6 +2207,7 @@ int CvDealAI::GetThirdPartyWarValue(bool bFromMe, PlayerTypes eOtherPlayer, Team
 		// Add 50 gold per era
 		int iExtraCost = eOurEra * 50;
 		iItemValue += iExtraCost;
+#endif
 
 		// Modify based on our War Approach
 		int iWarBias = /*5*/ GC.getDEFAULT_FLAVOR_VALUE() - iWarApproachWeight;
@@ -2150,6 +2244,17 @@ int CvDealAI::GetThirdPartyWarValue(bool bFromMe, PlayerTypes eOtherPlayer, Team
 				iItemValue *= 75;
 				iItemValue /= 100;
 			}
+#ifdef RAI_THIRD_PARTY_WAR_TWEAKS
+			else if(eOpinionTowardsWarPlayer == MAJOR_CIV_OPINION_FAVORABLE)
+			{
+				iItemValue *= 200;
+				iItemValue /= 100;
+			}
+			else if(eOpinionTowardsWarPlayer >= MAJOR_CIV_OPINION_FRIEND)
+			{
+				iItemValue = 100000;
+			}
+#endif
 		}
 
 		// Modify for our feelings towards the asking player
@@ -2178,6 +2283,25 @@ int CvDealAI::GetThirdPartyWarValue(bool bFromMe, PlayerTypes eOtherPlayer, Team
 	// From them
 	else
 	{
+#ifdef RAI_DEALS_CONSIDER_MILITARY_STRENGTH
+		iItemValue = GET_PLAYER(eOtherPlayer).GetMilitaryMight() * GC.getTHIRD_PARTY_WAR_MILITARY_STRENGTH_FACTOR() / 200;
+
+		// Minor
+		if(bMinor)
+			iItemValue = -100000;
+
+		// Major
+		else
+		{
+			// Modify for our feelings towards the player they would go to war with
+			if(eOpinionTowardsWarPlayer == MAJOR_CIV_OPINION_UNFORGIVABLE)
+				iItemValue = (iItemValue * 2);
+			else if(eOpinionTowardsWarPlayer == MAJOR_CIV_OPINION_ENEMY)
+			{}
+			else
+				iItemValue = -100000;
+		}
+#else
 		// Minor
 		if(bMinor)
 			iItemValue = -100000;
@@ -2193,6 +2317,7 @@ int CvDealAI::GetThirdPartyWarValue(bool bFromMe, PlayerTypes eOtherPlayer, Team
 			else
 				iItemValue = -100000;
 		}
+#endif
 	}
 
 	return iItemValue;
